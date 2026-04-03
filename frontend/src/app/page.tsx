@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext, useIsLoggedIn, useUserWallets } from "@dynamic-labs/sdk-react-core";
 import { Header } from "@/components/Header";
 import { MarketCard } from "@/components/MarketCard";
 import { Market, UserBet, getContract, ERC20_ABI, USDC_ADDRESS, formatUsdc } from "@/lib/contract";
@@ -38,7 +38,9 @@ function StatBox({ label, value, color }: { label: string; value: string | numbe
 }
 
 export default function Home() {
-  const { primaryWallet } = useDynamicContext();
+  const { primaryWallet, authToken } = useDynamicContext();
+  const isLoggedIn  = useIsLoggedIn();
+  const userWallets = useUserWallets();
   const userAddress = primaryWallet?.address;
 
   const [markets,     setMarkets]     = useState<Market[]>([]);
@@ -46,6 +48,7 @@ export default function Home() {
   const [usdcBal,     setUsdcBal]     = useState<string>("—");
   const [initialLoad, setInitialLoad] = useState(true);
   const [generating,  setGenerating]  = useState(false);
+  const [verifiedUser, setVerifiedUser] = useState<{ userId: string; wallets: any[] } | null>(null);
   const [filter,      setFilter]      = useState<Filter>("live");
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [livePrices,  setLivePrices]  = useState<Record<string, number>>({});
@@ -93,6 +96,15 @@ export default function Home() {
         setInitialLoad(false);
       });
   }, [lastRefresh]);
+
+  // Verify Dynamic JWT on the server side when user logs in
+  useEffect(() => {
+    if (!isLoggedIn || !authToken) { setVerifiedUser(null); return; }
+    fetch("/api/verify-user", { headers: { Authorization: `Bearer ${authToken}` } })
+      .then((r) => r.json())
+      .then((data) => { if (data.verified) setVerifiedUser(data); })
+      .catch(() => {});
+  }, [isLoggedIn, authToken]);
 
   // Load user bets + USDC balance
   useEffect(() => {
@@ -206,10 +218,20 @@ export default function Home() {
           <StatBox label="USDC Pooled" value={`$${formatUsdc(totalPool)}`} color="border-px-purple" />
         </div>
 
-        {/* ── Player balance ────────────────────────────────────── */}
+        {/* ── Player balance + wallet info ──────────────────────── */}
         {userAddress && (
-          <div className="mb-4 flex items-center justify-end gap-2 font-pixel text-xs">
-            <span className="text-px-dim uppercase tracking-widest">Your USDC:</span>
+          <div className="mb-4 flex items-center justify-end gap-3 font-pixel text-xs flex-wrap">
+            {verifiedUser && (
+              <span className="text-px-green border border-px-green px-2 py-0.5 uppercase tracking-widest">
+                ✓ Verified
+              </span>
+            )}
+            {userWallets.length > 1 && (
+              <span className="text-px-purple border border-px-purple px-2 py-0.5 uppercase tracking-widest">
+                {userWallets.length} wallets
+              </span>
+            )}
+            <span className="text-px-dim uppercase tracking-widest">USDC:</span>
             <span className="text-px-yellow neon-yellow font-bold font-sans">${usdcBal}</span>
           </div>
         )}

@@ -64,7 +64,7 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
       }
     }
 
-    return new ethers.BrowserProvider(walletClient.transport).getSigner();
+    return provider.getSigner();
   }
 
   async function handleBet() {

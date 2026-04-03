@@ -1,6 +1,6 @@
 "use client";
 
-import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import { DynamicWidget, useDynamicContext, useUserWallets } from "@dynamic-labs/sdk-react-core";
 
 const SPONSORS = [
   { name: "0G",        color: "text-px-cyan   border-px-cyan" },
@@ -9,7 +9,17 @@ const SPONSORS = [
   { name: "Chainlink", color: "text-px-yellow border-px-yellow" },
 ];
 
+function truncate(addr: string) {
+  return addr.slice(0, 6) + "…" + addr.slice(-4);
+}
+
 export function Header() {
+  const { primaryWallet, user, setShowDynamicUserProfile } = useDynamicContext();
+  const userWallets = useUserWallets();
+
+  const displayName = user?.email ?? user?.username ?? (primaryWallet ? truncate(primaryWallet.address) : null);
+  const walletCount = userWallets.length;
+
   return (
     <header className="sticky top-0 z-40 bg-px-bg/95 backdrop-blur border-b-2 border-px-border">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
@@ -39,9 +49,27 @@ export function Header() {
           ))}
         </div>
 
-        {/* Wallet */}
-        <div className="shrink-0 [&_button]:font-pixel [&_button]:uppercase [&_button]:tracking-wide">
-          <DynamicWidget />
+        {/* Right side: profile + wallet */}
+        <div className="flex items-center gap-2 shrink-0">
+          {primaryWallet && (
+            <button
+              onClick={() => setShowDynamicUserProfile(true)}
+              title="Open profile"
+              className="hidden sm:flex items-center gap-2 border border-px-purple/50 hover:border-px-purple bg-px-purple/10 hover:bg-px-purple/20 px-2.5 py-1.5 transition-colors"
+            >
+              <span className="text-px-purple font-pixel text-xs uppercase tracking-wide">
+                {displayName ?? truncate(primaryWallet.address)}
+              </span>
+              {walletCount > 1 && (
+                <span className="bg-px-purple text-white font-pixel text-xs px-1 leading-none py-0.5">
+                  {walletCount}
+                </span>
+              )}
+            </button>
+          )}
+          <div className="[&_button]:font-pixel [&_button]:uppercase [&_button]:tracking-wide">
+            <DynamicWidget />
+          </div>
         </div>
 
       </div>
