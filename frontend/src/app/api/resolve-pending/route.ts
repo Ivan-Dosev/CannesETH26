@@ -25,6 +25,20 @@ const FEEDS: Record<string, { address: string; divisor?: number }> = {
   "ETH_GAS":  { address: "0x169E633A2D1E6c10dD91238Ba11c4A708dfEF37C", divisor: 1e9 },
 };
 
+// Module-level cached providers — created once, reused across requests
+let _arcProvider: ethers.JsonRpcProvider | null = null;
+let _ethProvider: ethers.JsonRpcProvider | null = null;
+
+function getArcProvider() {
+  if (!_arcProvider) _arcProvider = new ethers.JsonRpcProvider(ARC_RPC);
+  return _arcProvider;
+}
+
+function getEthProvider() {
+  if (!_ethProvider) _ethProvider = new ethers.JsonRpcProvider(ETH_RPC);
+  return _ethProvider;
+}
+
 // Parse the market question to extract feed key, threshold, and direction
 function parseMarket(question: string): { feedKey: string; rawThreshold: bigint; optionIfAbove: number } | null {
   // Determine direction: "below/drop/fall/stay below/sink" = bearish (optionIfAbove=1)
@@ -71,28 +85,36 @@ export async function POST() {
   const failed:   number[] = [];
 
   try {
-    const arcProvider = new ethers.JsonRpcProvider(ARC_RPC);
-    const ethProvider = new ethers.JsonRpcProvider(ETH_RPC);
+    const arcProvider = getArcProvider();
+    const ethProvider = getEthProvider();
     const wallet      = new ethers.Wallet(DEPLOYER_KEY, arcProvider);
     const contract    = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
 
     const count = Number(await contract.marketCount());
     const now   = Math.floor(Date.now() / 1000);
 
+    // Fetch all markets in parallel — much faster than sequential loop
+    const allMarkets = await Promise.all(
+      Array.from({ length: count }, async (_, i) => {
+        try {
+          const m = await contract.getMarket(i);
+          return { id: i, question: m.question as string, expiry: Number(m.expiry), resolved: m.resolved as boolean, cancelled: m.cancelled as boolean };
+        } catch {
+          return null;
+        }
+      })
+    );
+
     // Find expired but unresolved markets
-    const pending: { id: number; question: string }[] = [];
-    for (let i = 0; i < count; i++) {
-      const m = await contract.getMarket(i);
-      if (!m.resolved && !m.cancelled && now >= Number(m.expiry)) {
-        pending.push({ id: i, question: m.question });
-      }
-    }
+    const pending = allMarkets.filter(
+      (m): m is NonNullable<typeof m> => m !== null && !m.resolved && !m.cancelled && now >= m.expiry
+    );
 
     if (pending.length === 0) {
       return NextResponse.json({ resolved: [], message: "Nothing to resolve" });
     }
 
-    // Cache Chainlink prices to avoid redundant calls
+    // Cache Chainlink prices — only fetch each feed once
     const priceCache: Record<string, bigint> = {};
 
     for (const { id, question } of pending) {

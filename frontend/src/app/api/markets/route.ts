@@ -9,17 +9,37 @@ const CONTRACT_ABI = [
   "function getMarket(uint256) view returns (string question, string[] options, uint256 expiry, uint256 totalPool, uint256[] optionPools, uint256 winningOption, bool resolved, bool cancelled, string storageHash)",
 ];
 
+// Module-level cached provider — created once, reused across requests
+let _provider: ethers.JsonRpcProvider | null = null;
+function getProvider() {
+  if (!_provider) _provider = new ethers.JsonRpcProvider(ARC_RPC);
+  return _provider;
+}
+
+// Simple in-memory cache: avoid re-fetching resolved markets that won't change
+interface CachedMarket {
+  id: number; question: string; options: string[]; expiry: number;
+  totalPool: string; optionPools: string[]; winningOption: number;
+  resolved: boolean; cancelled: boolean; storageHash: string;
+}
+const marketCache = new Map<number, CachedMarket>();
+
 export async function GET() {
   try {
-    const provider = new ethers.JsonRpcProvider(ARC_RPC);
+    const provider = getProvider();
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
     const count    = Number(await contract.marketCount());
 
+    // Fetch all markets in parallel, using cache for resolved/cancelled ones
     const results = await Promise.all(
       Array.from({ length: count }, async (_, i) => {
+        // Return cached copy if market is already final (resolved or cancelled)
+        const cached = marketCache.get(i);
+        if (cached && (cached.resolved || cached.cancelled)) return cached;
+
         try {
           const m = await contract.getMarket(i);
-          return {
+          const market: CachedMarket = {
             id:            i,
             question:      m.question,
             options:       Array.from(m.options as string[]),
@@ -31,6 +51,8 @@ export async function GET() {
             cancelled:     m.cancelled,
             storageHash:   m.storageHash,
           };
+          marketCache.set(i, market);
+          return market;
         } catch {
           return null;
         }

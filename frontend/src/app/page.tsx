@@ -64,7 +64,7 @@ export default function Home() {
       fetch("/api/resolve-pending", { method: "POST" }).catch(() => {});
       refresh();
     }
-    const id = setInterval(tick, 10_000);
+    const id = setInterval(tick, 20_000);
     return () => clearInterval(id);
   }, [refresh]);
 

@@ -3,6 +3,13 @@ import { ethers } from "ethers";
 
 const ETH_RPC = "https://ethereum-rpc.publicnode.com";
 
+// Cached provider — created once, reused across requests to avoid repeated eth_chainId calls
+let _provider: ethers.JsonRpcProvider | null = null;
+function getEthProvider() {
+  if (!_provider) _provider = new ethers.JsonRpcProvider(ETH_RPC);
+  return _provider;
+}
+
 const AGGREGATOR_ABI = [
   "function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
   "function decimals() view returns (uint8)",
@@ -18,7 +25,7 @@ const FEEDS: Record<string, { address: string; decimals?: number; divisor?: numb
 
 export async function GET() {
   try {
-    const provider = new ethers.JsonRpcProvider(ETH_RPC);
+    const provider = getEthProvider();
     const results: Record<string, number> = {};
 
     await Promise.all(
