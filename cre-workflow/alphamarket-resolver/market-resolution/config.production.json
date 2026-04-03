@@ -1,0 +1,13 @@
+{
+  "_comment": "AlphaMarket CRE Resolution — Chainlink ETH/USD mainnet feed, runs every 30s",
+  "schedule": "*/30 * * * * *",
+  "evms": [
+    {
+      "chainSelectorName": "ethereum-mainnet",
+      "predictionMarketAddress": "0xEb792aF46AB2c2f1389A774AB806423DB43aA425",
+      "priceFeedAddress": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+      "gasLimit": "500000"
+    }
+  ],
+  "marketIdsToCheck": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+}

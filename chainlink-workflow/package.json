@@ -1,0 +1,22 @@
+{
+  "name": "alphamarket-chainlink-workflow",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "simulate": "ts-node src/simulate.ts",
+    "start": "ts-node src/watcher.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "winston": "^3.13.0",
+    "jsonpath-plus": "^9.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.0.0"
+  }
+}

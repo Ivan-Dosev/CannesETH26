@@ -1,0 +1,25 @@
+{
+  "name": "alphmarket-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:arc": "hardhat run scripts/deploy.ts --network arc",
+    "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
+    "cancel:arc": "hardhat run scripts/cancelMarkets.ts --network arc",
+    "resolve:arc": "hardhat run scripts/resolveMarket.ts --network arc",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}

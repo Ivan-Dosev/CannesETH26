@@ -1,0 +1,646 @@
+[
+  {
+    "type": "constructor",
+    "stateMutability": "undefined",
+    "payable": false,
+    "inputs": [
+      {
+        "type": "address",
+        "name": "_usdc"
+      },
+      {
+        "type": "address",
+        "name": "_aiAgent"
+      },
+      {
+        "type": "address",
+        "name": "_chainlinkResolver"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OwnableInvalidOwner",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "owner"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OwnableUnauthorizedAccount",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "account"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "token"
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "AgentUpdated",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "newAgent",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "BetPlaced",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "bettor",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "optionIndex",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "amount",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MarketCancelled",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MarketCreated",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId",
+        "indexed": true
+      },
+      {
+        "type": "string",
+        "name": "question",
+        "indexed": false
+      },
+      {
+        "type": "string[]",
+        "name": "options"
+      },
+      {
+        "type": "uint256",
+        "name": "expiry",
+        "indexed": false
+      },
+      {
+        "type": "string",
+        "name": "storageHash",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "MarketResolved",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "winningOption",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "OwnershipTransferred",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "previousOwner",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "newOwner",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "ResolverUpdated",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "newResolver",
+        "indexed": true
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "anonymous": false,
+    "name": "WinningsClaimed",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "bettor",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "amount",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "BPS_DENOMINATOR",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "MIN_BET",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "PROTOCOL_FEE_BPS",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "aiAgent",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "address",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "bets",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      },
+      {
+        "type": "address",
+        "name": ""
+      }
+    ],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": "amount"
+      },
+      {
+        "type": "uint256",
+        "name": "optionIndex"
+      },
+      {
+        "type": "bool",
+        "name": "claimed"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "cancelMarket",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "chainlinkResolver",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "address",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "claimWinnings",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "createMarket",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "string",
+        "name": "question"
+      },
+      {
+        "type": "string[]",
+        "name": "options"
+      },
+      {
+        "type": "uint256",
+        "name": "expiry"
+      },
+      {
+        "type": "string",
+        "name": "storageHash"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getActiveMarkets",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256[]",
+        "name": "ids"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getMarket",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "string",
+        "name": "question"
+      },
+      {
+        "type": "string[]",
+        "name": "options"
+      },
+      {
+        "type": "uint256",
+        "name": "expiry"
+      },
+      {
+        "type": "uint256",
+        "name": "totalPool"
+      },
+      {
+        "type": "uint256[]",
+        "name": "optionPools"
+      },
+      {
+        "type": "uint256",
+        "name": "winningOption"
+      },
+      {
+        "type": "bool",
+        "name": "resolved"
+      },
+      {
+        "type": "bool",
+        "name": "cancelled"
+      },
+      {
+        "type": "string",
+        "name": "storageHash"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "getUserBet",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      },
+      {
+        "type": "address",
+        "name": "user"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": "amount"
+      },
+      {
+        "type": "uint256",
+        "name": "optionIndex"
+      },
+      {
+        "type": "bool",
+        "name": "claimed"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "marketCount",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "markets",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": ""
+      }
+    ],
+    "outputs": [
+      {
+        "type": "string",
+        "name": "question"
+      },
+      {
+        "type": "uint256",
+        "name": "expiry"
+      },
+      {
+        "type": "uint256",
+        "name": "totalPool"
+      },
+      {
+        "type": "uint256",
+        "name": "winningOption"
+      },
+      {
+        "type": "bool",
+        "name": "resolved"
+      },
+      {
+        "type": "bool",
+        "name": "cancelled"
+      },
+      {
+        "type": "string",
+        "name": "storageHash"
+      },
+      {
+        "type": "address",
+        "name": "creator"
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "address",
+        "name": ""
+      }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "placeBet",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      },
+      {
+        "type": "uint256",
+        "name": "optionIndex"
+      },
+      {
+        "type": "uint256",
+        "name": "amount"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "refundBet",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "renounceOwnership",
+    "constant": false,
+    "payable": false,
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "resolveMarket",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "marketId"
+      },
+      {
+        "type": "uint256",
+        "name": "winningOption"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "setAiAgent",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "address",
+        "name": "_agent"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "setChainlinkResolver",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "address",
+        "name": "_resolver"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "constant": false,
+    "payable": false,
+    "inputs": [
+      {
+        "type": "address",
+        "name": "newOwner"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "usdc",
+    "constant": true,
+    "stateMutability": "view",
+    "payable": false,
+    "inputs": [],
+    "outputs": [
+      {
+        "type": "address",
+        "name": ""
+      }
+    ]
+  }
+]

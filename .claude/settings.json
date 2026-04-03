@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3001/api/create-markets -X POST)",
+      "Bash(curl -s -X POST https://rpc.testnet.arc.network -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}')",
+      "Bash(curl -s -X POST https://rpc.testnet.arc.network -H 'Content-Type: application/json' -H 'Origin: http://localhost:3001' -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x740b23a4E67DA0B48484804A957D9d7Ef61A811e\",\"data\":\"0x5c36b186\"},\"latest\"],\"id\":1}')",
+      "Bash(curl -s -I -X OPTIONS https://rpc.testnet.arc.network -H 'Origin: http://localhost:3001' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: Content-Type')",
+      "Bash(node -e ':*)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(sw_vers)",
+      "Bash(curl -sSL https://app.chain.link/cre/install.sh)",
+      "Bash(bash)",
+      "Bash(export PATH=\"$HOME/.cre/bin:$PATH\")",
+      "Bash(cre version:*)",
+      "Bash(bun --version)",
+      "Bash(mkdir -p /Users/dimitrov/Desktop/hack/Hacky/cre-workflow)",
+      "Bash(cre workflow:*)",
+      "Bash(cre --help)",
+      "Bash(cre init:*)",
+      "Bash(cre templates:*)",
+      "Bash(cre login:*)",
+      "Bash(bun install:*)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
