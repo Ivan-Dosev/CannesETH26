@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
+import { withDeployerLock } from "@/lib/deployerLock";
 
 const ARC_RPC          = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
@@ -79,8 +80,9 @@ export async function POST() {
   if (resolving) {
     return NextResponse.json({ skipped: "already running" });
   }
-
   resolving = true;
+
+  return withDeployerLock(async () => {
   const resolved: number[] = [];
   const failed:   number[] = [];
 
@@ -117,6 +119,9 @@ export async function POST() {
     // Cache Chainlink prices — only fetch each feed once
     const priceCache: Record<string, bigint> = {};
 
+    // Get nonce once and increment manually — prevents conflicts if multiple markets resolve
+    let nonce = await wallet.getNonce("pending");
+
     for (const { id, question } of pending) {
       try {
         const parsed = parseMarket(question);
@@ -137,13 +142,14 @@ export async function POST() {
         const livePrice = priceCache[feedKey];
         const winner    = livePrice > rawThreshold ? optionIfAbove : 1 - optionIfAbove;
 
-        const tx = await contract.resolveMarket(id, winner);
+        const tx = await contract.resolveMarket(id, winner, { nonce: nonce++ });
         await tx.wait();
         resolved.push(id);
         console.log(`[resolve-pending] Market ${id} resolved → option ${winner} (price ${livePrice} vs threshold ${rawThreshold})`);
       } catch (err: any) {
         console.error(`[resolve-pending] Market ${id} failed: ${err.message}`);
         failed.push(id);
+        nonce--; // revert nonce increment if tx failed to send
       }
     }
   } finally {
@@ -151,4 +157,5 @@ export async function POST() {
   }
 
   return NextResponse.json({ resolved, failed });
+  }); // end withDeployerLock
 }

@@ -25,10 +25,23 @@ interface CachedMarket {
 const marketCache = new Map<number, CachedMarket>();
 
 export async function GET() {
+  let count: number;
   try {
     const provider = getProvider();
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-    const count    = Number(await contract.marketCount());
+    count = Number(await contract.marketCount());
+  } catch (err: any) {
+    // Arc RPC unavailable — return whatever is in cache rather than 500
+    if (marketCache.size > 0) {
+      const cached = Array.from(marketCache.values());
+      return NextResponse.json({ markets: cached, stale: true });
+    }
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+
+  try {
+    const provider = getProvider();
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
     // Fetch all markets in parallel, using cache for resolved/cancelled ones
     const results = await Promise.all(
@@ -62,6 +75,11 @@ export async function GET() {
     const markets = results.filter(Boolean);
     return NextResponse.json({ markets });
   } catch (err: any) {
+    // Partial failure — return cache rather than nothing
+    if (marketCache.size > 0) {
+      const cached = Array.from(marketCache.values());
+      return NextResponse.json({ markets: cached, stale: true });
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
