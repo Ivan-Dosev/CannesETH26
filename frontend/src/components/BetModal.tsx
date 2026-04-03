@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ethers } from "ethers";
-import { useWalletClient } from "wagmi";
 import {
   Market,
   CONTRACT_ADDRESS,
@@ -13,7 +12,7 @@ import {
   getOptionOdds,
 } from "@/lib/contract";
 
-const ARC_RPC      = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
+const ARC_RPC       = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
 const ARC_CHAIN_HEX = "0x" + ARC_CHAIN_ID.toString(16);
 
 interface Props {
@@ -34,37 +33,43 @@ const OPTION_SELECTED = [
 ];
 
 export function BetModal({ market, onClose, onSuccess }: Props) {
-  const { data: walletClient } = useWalletClient();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [amount,  setAmount]  = useState("");
   const [status,  setStatus]  = useState<"idle" | "switching" | "approving" | "betting" | "claiming" | "done" | "error">("idle");
   const [errorMsg, setError]  = useState("");
 
+  // Use window.ethereum directly — bypasses wagmi's mainnet-locked transport.
+  // After wallet_switchEthereumChain we create a FRESH BrowserProvider so ethers
+  // doesn't throw NETWORK_ERROR from detecting the chain change on a stale instance.
   async function getSigner() {
-    if (!walletClient) throw new Error("Connect your wallet first");
-    const provider = new ethers.BrowserProvider(walletClient.transport);
-    const network  = await provider.getNetwork();
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) throw new Error("No wallet found — connect via the button above");
 
-    if (Number(network.chainId) !== ARC_CHAIN_ID) {
+    const chainIdHex = await ethereum.request({ method: "eth_chainId" }) as string;
+    if (parseInt(chainIdHex, 16) !== ARC_CHAIN_ID) {
       setStatus("switching");
       try {
-        await provider.send("wallet_switchEthereumChain", [{ chainId: ARC_CHAIN_HEX }]);
+        await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: ARC_CHAIN_HEX }] });
       } catch (err: any) {
         if (err.code === 4902 || err.code === -32603) {
-          await provider.send("wallet_addEthereumChain", [{
-            chainId:           ARC_CHAIN_HEX,
-            chainName:         "Arc Testnet",
-            nativeCurrency:    { name: "USDC", symbol: "USDC", decimals: 18 },
-            rpcUrls:           [ARC_RPC],
-            blockExplorerUrls: ["https://testnet.arcscan.app"],
-          }]);
+          await ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId:           ARC_CHAIN_HEX,
+              chainName:         "Arc Testnet",
+              nativeCurrency:    { name: "USDC", symbol: "USDC", decimals: 18 },
+              rpcUrls:           [ARC_RPC],
+              blockExplorerUrls: ["https://testnet.arcscan.app"],
+            }],
+          });
         } else {
           throw err;
         }
       }
     }
 
-    return provider.getSigner();
+    // Fresh provider on the now-correct chain
+    return new ethers.BrowserProvider(ethereum).getSigner();
   }
 
   async function handleBet() {
