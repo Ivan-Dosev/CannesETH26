@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useDynamicContext, useIsLoggedIn, useUserWallets } from "@dynamic-labs/sdk-react-core";
 import { Header } from "@/components/Header";
 import { MarketCard } from "@/components/MarketCard";
+import { PlayerProfile } from "@/components/PlayerProfile";
 import { Market, UserBet, getContract, ERC20_ABI, USDC_ADDRESS, formatUsdc } from "@/lib/contract";
 import { ethers } from "ethers";
 
@@ -38,7 +39,7 @@ function StatBox({ label, value, color }: { label: string; value: string | numbe
 }
 
 export default function Home() {
-  const { primaryWallet, authToken } = useDynamicContext();
+  const { primaryWallet, authToken, setShowDynamicUserProfile } = useDynamicContext();
   const isLoggedIn  = useIsLoggedIn();
   const userWallets = useUserWallets();
   const userAddress = primaryWallet?.address;
@@ -159,8 +160,10 @@ export default function Home() {
   const resolvedCount = markets.filter(isResolved).length;
   const totalPool     = markets.reduce((sum, m) => sum + m.totalPool, 0n);
 
-  const myBetMarkets = markets.filter((m) => userBets[m.id]);
-  const myBetCount   = myBetMarkets.length;
+  const myBetMarkets  = markets.filter((m) => userBets[m.id]);
+  const myBetCount    = myBetMarkets.length;
+  const betsWon       = myBetMarkets.filter((m) => m.resolved && userBets[m.id]?.optionIndex === m.winningOption).length;
+  const totalWagered  = myBetMarkets.reduce((sum, m) => sum + (userBets[m.id]?.amount ?? 0n), 0n);
 
   const filtered = markets.filter((m) => {
     if (filter === "live")     return isLive(m);
@@ -218,22 +221,16 @@ export default function Home() {
           <StatBox label="USDC Pooled" value={`$${formatUsdc(totalPool)}`} color="border-px-purple" />
         </div>
 
-        {/* ── Player balance + wallet info ──────────────────────── */}
+        {/* ── Dynamic Player Profile ────────────────────────────── */}
         {userAddress && (
-          <div className="mb-4 flex items-center justify-end gap-3 font-pixel text-xs flex-wrap">
-            {verifiedUser && (
-              <span className="text-px-green border border-px-green px-2 py-0.5 uppercase tracking-widest">
-                ✓ Verified
-              </span>
-            )}
-            {userWallets.length > 1 && (
-              <span className="text-px-purple border border-px-purple px-2 py-0.5 uppercase tracking-widest">
-                {userWallets.length} wallets
-              </span>
-            )}
-            <span className="text-px-dim uppercase tracking-widest">USDC:</span>
-            <span className="text-px-yellow neon-yellow font-bold font-sans">${usdcBal}</span>
-          </div>
+          <PlayerProfile
+            usdcBalance={usdcBal}
+            betsPlaced={myBetCount}
+            betsWon={betsWon}
+            totalWagered={totalWagered}
+            verifiedUser={verifiedUser}
+            onOpenProfile={() => setShowDynamicUserProfile(true)}
+          />
         )}
 
         {/* ── Claimable banner ──────────────────────────────────── */}
