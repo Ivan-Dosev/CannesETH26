@@ -5,21 +5,23 @@ import { Market, formatUsdc, getOptionOdds, getOptionPct } from "@/lib/contract"
 import { BetModal } from "./BetModal";
 
 interface Props {
-  market:     Market;
-  userBet?:   { amount: bigint; optionIndex: number; claimed: boolean } | null;
-  onRefresh:  () => void;
+  market:      Market;
+  userBet?:    { amount: bigint; optionIndex: number; claimed: boolean } | null;
+  onRefresh:   () => void;
   livePrices?: Record<string, number>;
+  onBetPlaced?: () => void;
 }
 
 function getLiveFeedKey(question: string): string | null {
-  if (/ETH\/USD|ETH.USD/i.test(question) && !/gas/i.test(question)) return "ETH/USD";
-  if (/SOL\/USD|SOL.USD/i.test(question)) return "SOL/USD";
   if (/gas/i.test(question)) return "ETH_GAS";
+  const m = question.match(/\b(ETH|SOL|BTC|AVAX)\/USD/i);
+  if (m) return `${m[1].toUpperCase()}/USD`;
   return null;
 }
 
 function formatLivePrice(key: string, value: number): string {
   if (key === "ETH_GAS") return `${value.toFixed(2)} gwei`;
+  if (key === "BTC/USD") return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -36,7 +38,7 @@ const OPTION_COLORS = [
   { bar: "bg-px-green",  border: "border-px-green",  glow: "shadow-glow-green"  },
 ];
 
-export function MarketCard({ market, userBet, onRefresh, livePrices = {} }: Props) {
+export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetPlaced }: Props) {
   const [betModalOpen, setBetModalOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -176,6 +178,20 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {} }: Prop
         </button>
       )}
 
+      {/* Bet placed, awaiting resolution */}
+      {userBet && expired && !market.resolved && !market.cancelled && (
+        <div className="w-full py-3 px-4 border-2 border-px-yellow bg-px-yellow/5 flex items-center justify-between">
+          <div>
+            <p className="font-pixel text-xs text-px-yellow neon-yellow uppercase tracking-widest">
+              ⏳ Awaiting Chainlink resolution
+            </p>
+            <p className="font-sans text-xs text-px-dim mt-0.5">
+              You bet <span className="text-white font-semibold">{formatUsdc(userBet.amount)} USDC</span> on &quot;{market.options[userBet.optionIndex]}&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
       {canClaim && (
         <button
           onClick={() => setBetModalOpen(true)}
@@ -186,8 +202,11 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {} }: Prop
       )}
 
       {didLose && (
-        <div className="w-full text-center py-2.5 font-pixel text-xs text-px-dim uppercase tracking-widest border border-px-border">
-          Bet on "{market.options[userBet!.optionIndex]}" — not the winner
+        <div className="w-full py-2.5 px-4 border border-px-border flex flex-col gap-0.5">
+          <p className="font-pixel text-xs text-px-red uppercase tracking-widest">✗ Better luck next time</p>
+          <p className="font-sans text-xs text-px-dim">
+            You bet on &quot;{market.options[userBet!.optionIndex]}&quot; — winner was &quot;{market.options[market.winningOption]}&quot;
+          </p>
         </div>
       )}
 
@@ -201,7 +220,7 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {} }: Prop
         <BetModal
           market={market}
           onClose={() => setBetModalOpen(false)}
-          onSuccess={() => { setBetModalOpen(false); onRefresh(); }}
+          onSuccess={() => { setBetModalOpen(false); onRefresh(); onBetPlaced?.(); }}
         />
       )}
     </div>

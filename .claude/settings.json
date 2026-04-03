@@ -23,7 +23,13 @@
       "Bash(git init:*)",
       "Bash(git remote:*)",
       "Bash(git branch:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(grep -E \"^.*\\\\.env$\")",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(curl -s -X POST http://localhost:3001/api/resolve-pending)",
+      "Bash(curl -s -X POST http://localhost:3001/api/create-markets)",
+      "Bash(npm install:*)"
     ],
     "additionalDirectories": [
       "/tmp"

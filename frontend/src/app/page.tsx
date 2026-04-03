@@ -18,7 +18,7 @@ async function fetchMarketsFromAPI(): Promise<Market[]> {
   }));
 }
 
-type Filter = "all" | "live" | "awaiting" | "resolved";
+type Filter = "all" | "live" | "awaiting" | "resolved" | "mybets";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -55,9 +55,13 @@ export default function Home() {
   const genTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const refresh = useCallback(() => setLastRefresh(Date.now()), []);
 
-  // Silent background poll every 10s
+  // Silent background poll every 10s + trigger resolution of pending markets
   useEffect(() => {
-    const id = setInterval(refresh, 10_000);
+    function tick() {
+      fetch("/api/resolve-pending", { method: "POST" }).catch(() => {});
+      refresh();
+    }
+    const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
   }, [refresh]);
 
@@ -143,10 +147,14 @@ export default function Home() {
   const resolvedCount = markets.filter(isResolved).length;
   const totalPool     = markets.reduce((sum, m) => sum + m.totalPool, 0n);
 
+  const myBetMarkets = markets.filter((m) => userBets[m.id]);
+  const myBetCount   = myBetMarkets.length;
+
   const filtered = markets.filter((m) => {
     if (filter === "live")     return isLive(m);
     if (filter === "awaiting") return isAwaiting(m);
     if (filter === "resolved") return isResolved(m);
+    if (filter === "mybets")   return !!userBets[m.id];
     return true;
   });
 
@@ -158,10 +166,11 @@ export default function Home() {
   );
 
   const FILTERS: { key: Filter; label: string; count: number; color: string }[] = [
-    { key: "all",      label: "ALL",      count: markets.length, color: "border-px-border text-px-dim" },
     { key: "live",     label: "LIVE",     count: liveCount,      color: "border-px-cyan   text-px-cyan"   },
     { key: "awaiting", label: "AWAITING", count: awaitingCount,  color: "border-px-yellow text-px-yellow" },
     { key: "resolved", label: "RESOLVED", count: resolvedCount,  color: "border-px-green  text-px-green"  },
+    { key: "all",      label: "ALL",      count: markets.length, color: "border-px-border text-px-dim" },
+    ...(userAddress ? [{ key: "mybets" as Filter, label: "MY BETS", count: myBetCount, color: "border-px-purple text-px-purple" }] : []),
   ];
 
   return (
@@ -208,7 +217,7 @@ export default function Home() {
         {/* ── Claimable banner ──────────────────────────────────── */}
         {claimable.length > 0 && (
           <button
-            onClick={() => setFilter("resolved")}
+            onClick={() => setFilter("mybets")}
             className="w-full mb-6 pixel-border-green bg-px-green/10 flex items-center justify-between px-5 py-4 hover:bg-px-green/20 transition-colors"
           >
             <div className="flex items-center gap-4 font-pixel">
@@ -217,7 +226,7 @@ export default function Home() {
                 <p className="text-px-green neon-green font-bold text-sm uppercase tracking-widest">
                   {claimable.length} WINNING BET{claimable.length > 1 ? "S" : ""} READY TO CLAIM
                 </p>
-                <p className="text-px-dim text-xs mt-0.5 uppercase tracking-widest">Click to view resolved markets →</p>
+                <p className="text-px-dim text-xs mt-0.5 uppercase tracking-widest">Click MY BETS to claim →</p>
               </div>
             </div>
             <span className="text-px-green text-xl">▶</span>
@@ -273,16 +282,22 @@ export default function Home() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 font-pixel">
             <div className="text-5xl mb-6">
-              {filter === "live" ? "⚡" : filter === "awaiting" ? "⏳" : filter === "resolved" ? "✓" : "🔮"}
+              {filter === "live" ? "⚡" : filter === "awaiting" ? "⏳" : filter === "resolved" ? "✓" : filter === "mybets" ? "🎯" : "🔮"}
             </div>
             <p className={`text-lg uppercase tracking-widest mb-2 ${
               filter === "live"     ? "text-px-cyan   neon-cyan"   :
               filter === "awaiting" ? "text-px-yellow neon-yellow" :
               filter === "resolved" ? "text-px-green  neon-green"  :
+              filter === "mybets"   ? "text-px-purple neon-purple" :
                                       "text-px-purple neon-purple"
             }`}>
-              No {filter} markets
+              {filter === "mybets" ? "No bets placed yet" : `No ${filter} markets`}
             </p>
+            {filter === "mybets" && (
+              <p className="text-px-dim text-xs uppercase tracking-widest">
+                Go to LIVE tab and place your first bet
+              </p>
+            )}
             {filter === "live" && (
               <p className="text-px-dim text-xs uppercase tracking-widest">
                 Click LIVE tab to generate fresh markets
@@ -298,6 +313,7 @@ export default function Home() {
                 userBet={userBets[market.id]}
                 onRefresh={refresh}
                 livePrices={livePrices}
+                onBetPlaced={() => setFilter("mybets")}
               />
             ))}
           </div>
