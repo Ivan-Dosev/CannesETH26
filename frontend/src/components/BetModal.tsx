@@ -75,15 +75,17 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
   async function handleBet() {
     if (selectedOption === null) return;
     const usdcAmount = parseFloat(amount);
-    if (isNaN(usdcAmount) || usdcAmount < 1) {
-      setError("Minimum bet is 1 USDC");
+    if (isNaN(usdcAmount) || usdcAmount < 0.01) {
+      setError("Minimum bet is 0.01 USDC");
       setStatus("error");
       return;
     }
 
     try {
       const signer       = await getSigner();
-      const usdcWei      = ethers.parseUnits(amount, 6);
+      // Round to 6 decimal places max (USDC has 6 decimals)
+      const rounded      = usdcAmount.toFixed(6);
+      const usdcWei      = ethers.parseUnits(rounded, 6);
       const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
       const betContract  = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
@@ -99,6 +101,7 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
 
       setStatus("betting");
       const tx = await betContract.placeBet(market.id, selectedOption, usdcWei);
+
       await tx.wait();
       setStatus("done");
       setTimeout(onSuccess, 1500);
@@ -189,13 +192,14 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
                 <div className="flex gap-2">
                   <input
                     type="number"
-                    min="1"
-                    placeholder="10"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="1"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="flex-1 bg-px-bg border-2 border-px-border focus:border-px-purple px-3 py-2 text-white text-xs font-pixel outline-none transition-colors"
                   />
-                  {["10", "50", "100"].map((v) => (
+                  {["0.1", "1", "10"].map((v) => (
                     <button
                       key={v}
                       onClick={() => setAmount(v)}
@@ -240,7 +244,8 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
                 ? "💰 CLAIM NOW"
                 : selectedOption === null
                 ? "SELECT AN OUTCOME"
-                : `BET ${amount || "?"} USDC`}
+                : `BET ${amount || "?"} USDC`
+              }
             </button>
           )}
         </div>
