@@ -32,7 +32,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
     /// @notice Chainlink CRE oracle address — the only address allowed to resolve markets
     address public chainlinkResolver;
 
-    uint256 public constant MIN_BET = 1e6;          // 1 USDC (6 decimals)
+    uint256 public constant MIN_BET = 1000;         // 0.001 USDC (6 decimals) — Arc micropayments
     uint256 public constant PROTOCOL_FEE_BPS = 200; // 2%
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
