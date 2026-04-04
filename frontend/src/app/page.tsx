@@ -5,6 +5,7 @@ import { useDynamicContext, useIsLoggedIn, useUserWallets } from "@dynamic-labs/
 import { Header } from "@/components/Header";
 import { MarketCard } from "@/components/MarketCard";
 import { PlayerProfile } from "@/components/PlayerProfile";
+import { AiBotPanel } from "@/components/AiBotPanel";
 import { Market, UserBet, getContract, ERC20_ABI, USDC_ADDRESS, formatUsdc } from "@/lib/contract";
 import { ethers } from "ethers";
 
@@ -373,6 +374,14 @@ export default function Home() {
         </section>
 
       </main>
+
+      {/* ── AI Bot Panel (floating) ───────────────────────────── */}
+      <AiBotPanel
+        markets={markets}
+        livePrices={livePrices}
+        userBets={userBets}
+        onBetPlaced={() => { refresh(); setFilter("mybets"); }}
+      />
     </div>
   );
 }
