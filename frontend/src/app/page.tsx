@@ -85,11 +85,11 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Fetch markets; auto-generate only when on LIVE tab with no live markets
+  // Fetch markets; keep old list visible while refreshing (no blank flash)
   useEffect(() => {
     fetchMarketsFromAPI()
       .then(async (loaded) => {
-        setMarkets(loaded);
+        setMarkets(loaded);        // swap in-place — old cards stay until new data lands
         setInitialLoad(false);
 
         // Always auto-generate when no live markets exist
@@ -100,7 +100,7 @@ export default function Home() {
       })
       .catch((e) => {
         console.error("fetchMarkets failed:", e);
-        setInitialLoad(false);
+        setInitialLoad(false);    // on error keep whatever is already displayed
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastRefresh]);
@@ -357,7 +357,7 @@ export default function Home() {
                 userBet={userBets[market.id]}
                 onRefresh={refresh}
                 livePrices={livePrices}
-                onBetPlaced={() => { refresh(); setFilter("mybets"); }}
+                onBetPlaced={() => { refresh(); }}
                 sessionWallet={sessionWallet}
               />
             ))}
@@ -392,7 +392,7 @@ export default function Home() {
         markets={markets}
         livePrices={livePrices}
         userBets={userBets}
-        onBetPlaced={() => { refresh(); setFilter("mybets"); }}
+        onBetPlaced={() => { refresh(); }}
         onSessionWallet={(addr, wallet) => { setSessionAddress(addr); setSessionWallet(wallet ?? null); }}
       />
     </div>

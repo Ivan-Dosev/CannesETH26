@@ -170,7 +170,9 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetP
         </a>
       )}
 
-      {/* Actions */}
+      {/* ── User journey status strip ──────────────────────────── */}
+
+      {/* Step 1 — Live, no bet yet */}
       {!market.resolved && !market.cancelled && !expired && !userBet && (
         <button
           onClick={() => setBetModalOpen(true)}
@@ -180,41 +182,78 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetP
         </button>
       )}
 
-      {/* Bet placed, awaiting resolution */}
-      {userBet && expired && !market.resolved && !market.cancelled && (
-        <div className="w-full py-3 px-4 border-2 border-px-yellow bg-px-yellow/5 flex items-center justify-between">
+      {/* Step 2 — Bet placed, market still live */}
+      {userBet && !expired && !market.resolved && !market.cancelled && (
+        <div className="w-full py-3 px-4 border-2 border-px-purple bg-px-purple/10 flex items-center gap-3">
+          <span className="text-px-purple text-lg">🎯</span>
           <div>
-            <p className="font-pixel text-xs text-px-yellow neon-yellow uppercase tracking-widest">
-              ⏳ Awaiting Chainlink resolution
+            <p className="font-pixel text-xs text-px-purple uppercase tracking-widest">
+              Bet placed — market still running
             </p>
             <p className="font-sans text-xs text-px-dim mt-0.5">
-              You bet <span className="text-white font-semibold">{formatUsdc(userBet.amount)} USDC</span> on &quot;{market.options[userBet.optionIndex]}&quot;
+              <span className="text-white font-semibold">{formatUsdc(userBet.amount)} USDC</span> on &quot;{market.options[userBet.optionIndex]}&quot; · waiting for expiry
             </p>
           </div>
         </div>
       )}
 
-      {canClaim && (
-        <button
-          onClick={() => setBetModalOpen(true)}
-          className="btn-pixel w-full bg-px-green text-black font-pixel font-bold py-3 uppercase tracking-widest text-sm hover:brightness-110 transition-all animate-pulse"
-        >
-          💰 CLAIM WINNINGS
-        </button>
-      )}
-
-      {didLose && (
-        <div className="w-full py-2.5 px-4 border border-px-border flex flex-col gap-0.5">
-          <p className="font-pixel text-xs text-px-red uppercase tracking-widest">✗ Better luck next time</p>
-          <p className="font-sans text-xs text-px-dim">
-            You bet on &quot;{market.options[userBet!.optionIndex]}&quot; — winner was &quot;{market.options[market.winningOption]}&quot;
-          </p>
+      {/* Step 3 — Expired, awaiting Chainlink resolution */}
+      {userBet && expired && !market.resolved && !market.cancelled && (
+        <div className="w-full py-3 px-4 border-2 border-px-yellow bg-px-yellow/5 flex items-center gap-3">
+          <span className="text-lg">⏳</span>
+          <div>
+            <p className="font-pixel text-xs text-px-yellow neon-yellow uppercase tracking-widest">
+              Awaiting Chainlink resolution
+            </p>
+            <p className="font-sans text-xs text-px-dim mt-0.5">
+              <span className="text-white font-semibold">{formatUsdc(userBet.amount)} USDC</span> on &quot;{market.options[userBet.optionIndex]}&quot; · oracle reading price…
+            </p>
+          </div>
         </div>
       )}
 
+      {/* Step 4a — Won, claim available */}
+      {canClaim && (
+        <div className="flex flex-col gap-2">
+          <div className="w-full py-2.5 px-4 border-2 border-px-green bg-px-green/10 flex items-center gap-3">
+            <span className="text-lg">🏆</span>
+            <div>
+              <p className="font-pixel text-xs text-px-green neon-green uppercase tracking-widest">You won!</p>
+              <p className="font-sans text-xs text-px-dim mt-0.5">
+                &quot;{market.options[userBet!.optionIndex]}&quot; was correct · claim your winnings below
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setBetModalOpen(true)}
+            className="btn-pixel w-full bg-px-green text-black font-pixel font-bold py-3 uppercase tracking-widest text-sm hover:brightness-110 transition-all animate-pulse"
+          >
+            💰 CLAIM WINNINGS
+          </button>
+        </div>
+      )}
+
+      {/* Step 4b — Lost */}
+      {didLose && (
+        <div className="w-full py-3 px-4 border-2 border-px-red/40 bg-px-red/5 flex items-center gap-3">
+          <span className="text-lg">💀</span>
+          <div>
+            <p className="font-pixel text-xs text-px-red uppercase tracking-widest">Better luck next time</p>
+            <p className="font-sans text-xs text-px-dim mt-0.5">
+              You picked &quot;{market.options[userBet!.optionIndex]}&quot; · winner was &quot;{market.options[market.winningOption]}&quot;
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5 — Claimed */}
       {claimed && (
-        <div className="w-full text-center py-2.5 font-pixel text-xs text-px-green neon-green uppercase tracking-widest border border-px-green">
-          ✓ Winnings Claimed
+        <div className="w-full py-3 px-4 border-2 border-px-green/40 bg-px-green/5 flex items-center gap-3">
+          <span className="text-lg">✅</span>
+          <div>
+            <p className="font-pixel text-xs text-px-green neon-green uppercase tracking-widest">Winnings claimed</p>
+            <p className="font-sans text-xs text-px-dim mt-0.5">USDC sent to your wallet</p>
+          </div>
         </div>
       )}
 

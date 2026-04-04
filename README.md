@@ -159,6 +159,112 @@ The most advanced workflow — fires automatically when anyone calls `raiseDispu
 
 ---
 
+## How 0G Is Used
+
+### 1. 0G Compute — AI Market Generation
+
+**Model:** `neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8`
+**Endpoint:** `https://api.0g.ai/v1` (OpenAI-compatible)
+
+Used in **three places:**
+
+**1. Market generation (`agent/src/marketGenerator.ts` + `frontend/src/app/api/create-markets/route.ts`)**
+Every 2 minutes the system calls 0G Compute with:
+- Live Chainlink prices (ETH/USD, BTC/USD, SOL/USD, AVAX/USD, ETH Gas) injected into the prompt
+- Fear & Greed index as sentiment context
+- Instructions to generate binary prediction markets with exact Chainlink feed addresses for resolution
+
+The LLM returns creative, contextually grounded questions like *"Will ETH/USD hold above $2,040 in 2min? (Chainlink: $2,054)"* — thresholds are derived from real live data, not hardcoded.
+
+**2. Trading bot strategy parsing (`frontend/src/app/api/parse-strategy/route.ts`)**
+When a user types a natural language strategy like *"Bet $0.5 on ETH markets when 20 seconds remain"*, the request is sent to 0G Compute which extracts structured parameters: asset filter, trigger timing, bet amount, max bets. Keyword fallback is used when no API key is configured.
+
+---
+
+### 2. 0G Storage — On-Chain AI Provenance
+
+**SDK:** `@0glabs/0g-ts-sdk`
+**Storage node:** `https://storage-node.0g.ai`
+
+For every market created, the full AI provenance metadata is uploaded to 0G decentralized storage as a JSON blob:
+```json
+{
+  "version": "1",
+  "generatedAt": "2026-04-04T...",
+  "modelId": "neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8",
+  "question": "Will ETH/USD hold above $2,040 in 2min?",
+  "options": ["Yes, holds above", "No, breaks below"],
+  "confidence": 0.78,
+  "reasoning": "ETH trading at $2,054. Key support at $2,040 (-0.7%)...",
+  "resolutionApi": "chainlink://0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+  "sources": ["https://etherscan.io/address/0x5f4eC..."]
+}
+```
+
+The 0G Storage root hash is stored **immutably on-chain** in the `storageHash` field of every market in `PredictionMarket.sol`. Anyone can take any market's storage hash and retrieve the full AI reasoning that created it — verifiable provenance from AI to on-chain.
+
+**On-chain proof:** Every market on Arc testnet (`0x9E584eA06196D97Db5539a24193E5DfEF356BA06`) has a `storageHash` field. When `ZG_API_KEY` is configured, these are real `0g://` root hashes. Call `getMarket(id)` on the contract to see them.
+
+---
+
+### Why This Qualifies for 0G's "AI-Native DeFi" Bounty
+
+AlphaMarket hits the exact use case 0G described: *"AI-powered prediction market with on-chain model provenance + verifiable AI inference"*
+
+- **Autonomous** — no human creates or resolves markets, the AI + Chainlink do it all
+- **Verifiable** — every market has a 0G Storage hash on-chain pointing to the exact model, prompt, and reasoning
+- **Economically self-sustaining** — 2% protocol fee on all winnings funds ongoing operation
+
+### ⚠️ Important: ZG_API_KEY Required
+
+Without `ZG_API_KEY` set in `.env`, the system falls back to deterministic template markets and mock storage hashes (`0g://mock-...`). To demonstrate real 0G Compute usage:
+1. Get an API key from `https://dashboard.0g.ai` or ask the 0G team at the hackathon
+2. Add to `frontend/.env`: `ZG_API_KEY=your_key_here`
+3. Markets will then be AI-generated and storage hashes will be real `0g://` root hashes verifiable on-chain
+
+### One-Line Pitch for 0G
+
+> "AlphaMarket uses 0G Compute (LLaMA-70B) to autonomously generate prediction markets grounded in live Chainlink data, and 0G Storage to store full AI provenance for every market — with the root hash stored immutably on-chain so anyone can verify which model created the market and why."
+
+---
+
+## How Dynamic Is Used
+
+### 1. Dynamic JS SDK — User Wallet (Frontend)
+
+**Package:** `@dynamic-labs/sdk-react-core`, `@dynamic-labs/ethereum`
+
+`DynamicContextProvider` wraps the entire app with `EthereumWalletConnectors`, supporting MetaMask, embedded wallets, and any injected wallet out of the box.
+
+**Hooks used across the app:**
+- `useDynamicContext()` — `primaryWallet` (address + signer), `authToken` (JWT), `setShowDynamicUserProfile`, `handleLogOut`
+- `useIsLoggedIn()` — gates the entire betting UI; unauthenticated users see connect prompt
+- `useUserWallets()` — lists all linked wallets in the Player Profile panel
+
+**Server-side JWT verification (`frontend/src/app/api/verify-user/route.ts`):**
+When a user authenticates, Dynamic issues an RS256 JWT. The backend verifies it using Dynamic's JWKS endpoint (`https://app.dynamic.xyz/api/v0/sdk/{envId}/.well-known/jwks`) — pure Web Crypto API, no external libraries. The verified user identity is shown with a "JWT Verified" badge in the Player Profile.
+
+---
+
+### 2. Dynamic Node SDK — AI Agent Server Wallet (Backend)
+
+**API:** `https://app.dynamic.xyz/api/v0`
+
+The AI agent that creates markets on-chain uses a Dynamic **server wallet** as its identity — not a raw private key in a `.env` file:
+
+1. On startup, the agent calls Dynamic's API to get or create a managed EVM wallet (`getOrCreateAgentWallet()`)
+2. That wallet address is registered in `PredictionMarket.sol` as `aiAgent` — the **only** address allowed to call `createMarket()`
+3. When creating a market, the agent POSTs the transaction payload to Dynamic's signing API — Dynamic holds the key, the agent never touches it
+4. If the agent is compromised, the server wallet can be revoked via Dynamic's dashboard without redeploying the contract
+
+**Why this matters:** The `onlyAiAgent` modifier in the smart contract means Dynamic's managed wallet is the on-chain gatekeeper for all market creation. No Dynamic → no new markets.
+
+### One-Line Pitch for Dynamic
+
+> "We use Dynamic on both ends — the JS SDK for user wallet connect with server-side JWT verification, and the Node SDK to give the AI agent a managed server wallet so it signs on-chain transactions without ever holding a private key."
+
+---
+
 ## Project Structure
 
 ```
