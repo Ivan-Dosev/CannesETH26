@@ -111,12 +111,17 @@ export default function Home() {
       .catch(() => {});
   }, [isLoggedIn, authToken]);
 
-  // Load user bets + USDC balance
+  // Load user bets + USDC balance — always use a fresh provider so new bets appear immediately
   useEffect(() => {
-    if (!userAddress) { setUserBets({}); setUsdcBal("—"); return; }
-    const contract = getContract();
-    const provider = contract.runner as ethers.Provider;
-    const usdc     = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider);
+    if (!userAddress || markets.length === 0) { setUserBets({}); setUsdcBal("—"); return; }
+    const ARC_RPC = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
+    const provider = new ethers.JsonRpcProvider(ARC_RPC);
+    const contract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!,
+      ["function getUserBet(uint256 marketId, address user) view returns (uint256 amount, uint256 optionIndex, bool claimed)"],
+      provider
+    );
+    const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider);
 
     usdc.balanceOf(userAddress)
       .then((bal: bigint) => setUsdcBal(formatUsdc(bal)))
@@ -124,15 +129,19 @@ export default function Home() {
 
     Promise.all(
       markets.map(async (m) => {
-        const [amount, optionIndex, claimed] = await contract.getUserBet(m.id, userAddress);
-        return { id: m.id, bet: amount > 0n ? { amount, optionIndex: Number(optionIndex), claimed } : null };
+        try {
+          const [amount, optionIndex, claimed] = await contract.getUserBet(m.id, userAddress);
+          return { id: m.id, bet: amount > 0n ? { amount, optionIndex: Number(optionIndex), claimed } : null };
+        } catch {
+          return { id: m.id, bet: null };
+        }
       })
     ).then((results) => {
       const map: Record<number, UserBet | null> = {};
       results.forEach(({ id, bet }) => { map[id] = bet; });
       setUserBets(map);
     }).catch(console.error);
-  }, [markets, userAddress]);
+  }, [markets, userAddress, lastRefresh]);
 
   // Generate new markets when switching to LIVE tab with no live markets
   async function triggerGenerate() {
@@ -336,7 +345,7 @@ export default function Home() {
                 userBet={userBets[market.id]}
                 onRefresh={refresh}
                 livePrices={livePrices}
-                onBetPlaced={() => setFilter("mybets")}
+                onBetPlaced={() => { refresh(); setFilter("mybets"); }}
               />
             ))}
           </div>
