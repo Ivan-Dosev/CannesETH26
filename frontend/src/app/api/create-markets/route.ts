@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
 import OpenAI from "openai";
-import { withDeployerLock } from "@/lib/deployerLock";
+import { getDeployerWallet } from "@/lib/deployerWallet";
 
 export const maxDuration = 60;
 
@@ -156,10 +156,8 @@ function fallbackPool(feeds: Record<string, FeedData | null>, dMin: number): Mar
   return shuffle(pool);
 }
 
-// Cached providers — reused across requests
-let _arcProvider: ethers.JsonRpcProvider | null = null;
+// Cached Ethereum provider for Chainlink feed reads
 let _ethProvider: ethers.JsonRpcProvider | null = null;
-function getArcProvider() { if (!_arcProvider) _arcProvider = new ethers.JsonRpcProvider(ARC_RPC); return _arcProvider; }
 function getCMEthProvider() { if (!_ethProvider) _ethProvider = new ethers.JsonRpcProvider(ETH_RPC); return _ethProvider; }
 
 // ── POST /api/create-markets ──────────────────────────────────────────────────
@@ -168,71 +166,68 @@ export async function POST() {
     return NextResponse.json({ error: "Server not configured" }, { status: 500 });
   }
 
-  return withDeployerLock(async () => {
-    try {
-      const arcProvider  = getArcProvider();
-      const ethProvider  = getCMEthProvider();
-      const wallet       = new ethers.Wallet(DEPLOYER_KEY, arcProvider);
-      const iface        = new ethers.Interface(CONTRACT_ABI);
-      const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, arcProvider);
+  try {
+    // NonceManager singleton — shared with resolve-pending, serialises nonces in-process
+    const wallet      = getDeployerWallet();
+    const ethProvider = getCMEthProvider();
+    const iface       = new ethers.Interface(CONTRACT_ABI);
+    // Use the underlying provider for read-only calls
+    const arcProvider = (wallet.signer as ethers.Wallet).provider as ethers.Provider;
+    const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, arcProvider);
 
-      // Fetch feeds in parallel (8s timeout)
-      const feedKeys = Object.keys(FEEDS);
-      const feedTimeout = new Promise<null[]>((r) => setTimeout(() => r(feedKeys.map(() => null)), 8000));
-      const feedResults = await Promise.race([
-        Promise.all(feedKeys.map((k) => readFeed(ethProvider, k).then((v) => [k, v] as [string, FeedData | null]))),
-        feedTimeout.then(() => feedKeys.map((k) => [k, null] as [string, null])),
-      ]);
+    // Fetch feeds in parallel (8s timeout)
+    const feedKeys = Object.keys(FEEDS);
+    const feedTimeout = new Promise<null[]>((r) => setTimeout(() => r(feedKeys.map(() => null)), 8000));
+    const feedResults = await Promise.race([
+      Promise.all(feedKeys.map((k) => readFeed(ethProvider, k).then((v) => [k, v] as [string, FeedData | null]))),
+      feedTimeout.then(() => feedKeys.map((k) => [k, null] as [string, null])),
+    ]);
 
-      const feeds: Record<string, FeedData | null> = {};
-      for (const [k, v] of feedResults) feeds[k] = v;
+    const feeds: Record<string, FeedData | null> = {};
+    for (const [k, v] of feedResults) feeds[k] = v;
 
-      const prices: Record<string, number> = {};
-      for (const [k, v] of Object.entries(feeds)) if (v) prices[k] = v.value;
+    const prices: Record<string, number> = {};
+    for (const [k, v] of Object.entries(feeds)) if (v) prices[k] = v.value;
 
-      const dMin = DURATION_SECS / 60;
+    const dMin = DURATION_SECS / 60;
 
-      // Try AI generation first, fall back to templates
-      let markets: MarketSpec[] = [];
-      if (ZG_API_KEY) {
-        try {
-          console.log("[create-markets] Using 0G Compute AI generation...");
-          markets = await generateWithAI(prices, dMin);
-          console.log(`[create-markets] AI generated ${markets.length} markets`);
-        } catch (err: any) {
-          console.warn("[create-markets] AI generation failed, using fallback:", err.message);
-        }
+    // Try AI generation first, fall back to templates
+    let markets: MarketSpec[] = [];
+    if (ZG_API_KEY) {
+      try {
+        console.log("[create-markets] Using 0G Compute AI generation...");
+        markets = await generateWithAI(prices, dMin);
+        console.log(`[create-markets] AI generated ${markets.length} markets`);
+      } catch (err: any) {
+        console.warn("[create-markets] AI generation failed, using fallback:", err.message);
       }
-
-      if (markets.length < 2) {
-        console.log("[create-markets] Using deterministic fallback pool");
-        markets = fallbackPool(feeds, dMin).slice(0, 2);
-      }
-
-      const startId = Number(await readContract.marketCount());
-      const created: number[] = [];
-
-      // Get current nonce once and increment manually to avoid race conditions
-      let nonce = await wallet.getNonce("pending");
-
-      for (let i = 0; i < markets.length; i++) {
-        const m        = markets[i];
-        const marketId = startId + i;
-        const expiry   = Math.floor(Date.now() / 1000) + DURATION_SECS;
-        const aiTag    = ZG_API_KEY ? "0g://ai-llama70b" : "0g://mock";
-        const hash     = `${aiTag}-${m.feedKey.toLowerCase().replace("/","-")}-${Date.now()}`;
-
-        const data = iface.encodeFunctionData("createMarket", [m.question, m.options, expiry, hash]);
-        const tx   = await wallet.sendTransaction({ to: CONTRACT_ADDRESS, data, nonce: nonce++ });
-        await tx.wait();
-        created.push(marketId);
-        console.log(`[create-markets] Market ${marketId}: ${m.question}`);
-      }
-
-      return NextResponse.json({ created, count: created.length, aiGenerated: !!ZG_API_KEY });
-    } catch (err: any) {
-      console.error("[create-markets]", err.message);
-      return NextResponse.json({ error: err.message }, { status: 500 });
     }
-  });
+
+    if (markets.length < 2) {
+      console.log("[create-markets] Using deterministic fallback pool");
+      markets = fallbackPool(feeds, dMin).slice(0, 2);
+    }
+
+    const startId = Number(await readContract.marketCount());
+    const created: number[] = [];
+
+    for (let i = 0; i < markets.length; i++) {
+      const m        = markets[i];
+      const marketId = startId + i;
+      const expiry   = Math.floor(Date.now() / 1000) + DURATION_SECS;
+      const aiTag    = ZG_API_KEY ? "0g://ai-llama70b" : "0g://mock";
+      const hash     = `${aiTag}-${m.feedKey.toLowerCase().replace("/","-")}-${Date.now()}`;
+
+      const data = iface.encodeFunctionData("createMarket", [m.question, m.options, expiry, hash]);
+      const tx   = await wallet.sendTransaction({ to: CONTRACT_ADDRESS, data });
+      await tx.wait();
+      created.push(marketId);
+      console.log(`[create-markets] Market ${marketId}: ${m.question}`);
+    }
+
+    return NextResponse.json({ created, count: created.length, aiGenerated: !!ZG_API_KEY });
+  } catch (err: any) {
+    console.error("[create-markets]", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }

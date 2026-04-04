@@ -82,20 +82,24 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Fetch markets; auto-generate when no live ones exist
+  // Fetch markets; auto-generate only when on LIVE tab with no live markets
   useEffect(() => {
     fetchMarketsFromAPI()
       .then(async (loaded) => {
         setMarkets(loaded);
         setInitialLoad(false);
 
+        // Only auto-generate if user is actively watching the LIVE tab
         const hasLive = loaded.some(isLive);
-        if (!hasLive && !generatingRef.current) await triggerGenerate();
+        if (!hasLive && !generatingRef.current && filter === "live") {
+          await triggerGenerate();
+        }
       })
       .catch((e) => {
         console.error("fetchMarkets failed:", e);
         setInitialLoad(false);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastRefresh]);
 
   // Verify Dynamic JWT on the server side when user logs in
@@ -279,24 +283,24 @@ export default function Home() {
           </button>
         </div>
 
+        {/* ── Generating banner (non-blocking — shows above existing markets) */}
+        {generating && (
+          <div className="text-center mb-4 font-pixel space-y-1 py-3 border border-px-yellow/30 bg-px-yellow/5">
+            <p className="text-px-yellow neon-yellow text-sm uppercase tracking-widest animate-pulse">
+              ⚡ AI is generating new markets...
+            </p>
+            <p className="text-px-dim text-xs uppercase tracking-widest">
+              Signing transactions on Arc · {genSeconds}s elapsed
+            </p>
+          </div>
+        )}
+
         {/* ── Markets grid ─────────────────────────────────────── */}
-        {initialLoad || generating ? (
-          <div>
-            {generating && (
-              <div className="text-center mb-6 font-pixel space-y-2">
-                <p className="text-px-yellow neon-yellow text-sm uppercase tracking-widest animate-pulse">
-                  ⚡ AI is generating new markets...
-                </p>
-                <p className="text-px-dim text-xs uppercase tracking-widest">
-                  Signing transactions on Arc · {genSeconds}s elapsed
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-px-card pixel-border h-52 animate-pulse" />
-              ))}
-            </div>
+        {initialLoad ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-px-card pixel-border h-52 animate-pulse" />
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24 font-pixel">

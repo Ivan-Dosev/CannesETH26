@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { withDeployerLock } from "@/lib/deployerLock";
+import { getDeployerWallet } from "@/lib/deployerWallet";
 
 const ARC_RPC          = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
@@ -82,24 +82,25 @@ export async function POST() {
   }
   resolving = true;
 
-  return withDeployerLock(async () => {
   const resolved: number[] = [];
   const failed:   number[] = [];
 
   try {
-    const arcProvider = getArcProvider();
+    // NonceManager singleton — shared with create-markets, serialises nonces in-process
+    const wallet      = getDeployerWallet();
     const ethProvider = getEthProvider();
-    const wallet      = new ethers.Wallet(DEPLOYER_KEY, arcProvider);
+    const arcProvider = (wallet.signer as ethers.Wallet).provider as ethers.Provider;
     const contract    = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+    const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, arcProvider);
 
-    const count = Number(await contract.marketCount());
+    const count = Number(await readContract.marketCount());
     const now   = Math.floor(Date.now() / 1000);
 
-    // Fetch all markets in parallel — much faster than sequential loop
+    // Fetch all markets in parallel
     const allMarkets = await Promise.all(
       Array.from({ length: count }, async (_, i) => {
         try {
-          const m = await contract.getMarket(i);
+          const m = await readContract.getMarket(i);
           return { id: i, question: m.question as string, expiry: Number(m.expiry), resolved: m.resolved as boolean, cancelled: m.cancelled as boolean };
         } catch {
           return null;
@@ -118,9 +119,6 @@ export async function POST() {
 
     // Cache Chainlink prices — only fetch each feed once
     const priceCache: Record<string, bigint> = {};
-
-    // Get nonce once and increment manually — prevents conflicts if multiple markets resolve
-    let nonce = await wallet.getNonce("pending");
 
     for (const { id, question } of pending) {
       try {
@@ -142,14 +140,14 @@ export async function POST() {
         const livePrice = priceCache[feedKey];
         const winner    = livePrice > rawThreshold ? optionIfAbove : 1 - optionIfAbove;
 
-        const tx = await contract.resolveMarket(id, winner, { nonce: nonce++ });
+        // NonceManager assigns nonces atomically — no manual nonce tracking needed
+        const tx = await contract.resolveMarket(id, winner);
         await tx.wait();
         resolved.push(id);
         console.log(`[resolve-pending] Market ${id} resolved → option ${winner} (price ${livePrice} vs threshold ${rawThreshold})`);
       } catch (err: any) {
         console.error(`[resolve-pending] Market ${id} failed: ${err.message}`);
         failed.push(id);
-        nonce--; // revert nonce increment if tx failed to send
       }
     }
   } finally {
@@ -157,5 +155,4 @@ export async function POST() {
   }
 
   return NextResponse.json({ resolved, failed });
-  }); // end withDeployerLock
 }
