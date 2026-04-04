@@ -28,7 +28,8 @@ function parseWithKeywords(instruction: string): BotStrategy {
 
   // Trigger
   const secMatch = text.match(/(\d+)\s*sec/);
-  const triggerSecondsLeft = secMatch ? parseInt(secMatch[1]) : 5;
+  // Default 20s — Arc txs take ~5s to mine, so firing at <20s risks "Betting closed"
+  const triggerSecondsLeft = secMatch ? Math.max(parseInt(secMatch[1]), 20) : 20;
 
   // Amount
   const amtMatch = text.match(/\$?([\d.]+)\s*usdc?/);

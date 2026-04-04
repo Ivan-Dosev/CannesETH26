@@ -48,10 +48,13 @@ function timestamp() {
   return new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+// Minimum trigger time — Arc tx takes ~3-5s to mine, so firing under 20s risks "Betting closed"
+const MIN_TRIGGER_SECS = 20;
+
 const SUGGESTIONS = [
-  "Bet $0.1 on ETH price markets when 5s left, bet on whichever side Chainlink favors",
-  "Auto-bet $0.5 on BTC and SOL markets under 8 seconds, max 5 bets",
-  "Watch all price markets, bet $0.2 on the likely winner when 3 seconds remain",
+  "Bet $0.1 on ETH price markets when 20s left, bet on whichever side Chainlink favors",
+  "Auto-bet $0.5 on BTC and SOL markets under 30 seconds, max 5 bets",
+  "Watch all price markets, bet $0.2 on the likely winner when 25 seconds remain",
 ];
 
 export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props) {
@@ -97,14 +100,20 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
       const data = await res.json();
 
       if (data.strategy) {
-        setStrategy(data.strategy);
+        // Enforce minimum trigger — Arc txs take 3-5s to mine
+        const safeTrigger = Math.max(data.strategy.triggerSecondsLeft, MIN_TRIGGER_SECS);
+        const strategy: BotStrategy = { ...data.strategy, triggerSecondsLeft: safeTrigger };
+        setStrategy(strategy);
         setBetsCount(0);
         bettedRef.current.clear();
         setBotActive(false);
         const src = data.source === "0g-ai" ? "0G Compute (LLaMA-70B)" : "keyword parser";
         addLog("ai", `✅ Strategy parsed via ${src}:`);
-        addLog("ai", `📋 ${data.strategy.description}`);
-        addLog("ai", `⚙️  Assets: ${data.strategy.assets.join(", ")} · Trigger: ≤${data.strategy.triggerSecondsLeft}s · $${data.strategy.betAmount}/bet · max ${data.strategy.maxBetsTotal} bets`);
+        addLog("ai", `📋 ${strategy.description}`);
+        if (safeTrigger > data.strategy.triggerSecondsLeft) {
+          addLog("info", `⚠️ Trigger raised to ${safeTrigger}s (Arc needs ~5s to mine — firing earlier prevents "Betting closed")`);
+        }
+        addLog("ai", `⚙️  Assets: ${strategy.assets.join(", ")} · Trigger: ≤${strategy.triggerSecondsLeft}s · $${strategy.betAmount}/bet · max ${strategy.maxBetsTotal} bets`);
         addLog("ai", `▶ Press START BOT to activate. Your wallet will prompt for each transaction.`);
       } else {
         addLog("error", `Could not parse strategy: ${data.error ?? "unknown"}`);
