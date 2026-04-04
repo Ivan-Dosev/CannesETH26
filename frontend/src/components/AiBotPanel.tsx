@@ -235,10 +235,10 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
 
   return (
     <>
-      {/* ── Floating trigger button ── */}
+      {/* ── Floating trigger button — hidden while panel is open ── */}
       <button
         onClick={() => setOpen(o => !o)}
-        className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 font-pixel text-xs uppercase tracking-widest border-2 transition-all shadow-lg ${
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 font-pixel text-xs uppercase tracking-widest border-2 transition-all shadow-lg ${open ? "hidden" : ""} ${
           botActive
             ? "bg-px-green/20 border-px-green text-px-green animate-pulse"
             : "bg-px-card border-px-purple text-px-purple hover:bg-px-purple/20"
