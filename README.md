@@ -90,7 +90,7 @@ Users can bet manually or describe a trading strategy in plain English and deplo
 |---|---|---|
 | **0G Compute** | LLaMA-70B generates market questions grounded in live Chainlink prices | Remove it → manual prediction market |
 | **0G Storage** | Stores full AI provenance (model, prompt, reasoning, confidence) per market | Remove it → no verifiable AI audit trail |
-| **Arc** | EVM L1 with native USDC — micropayments to fractions of a cent | Remove it → $1 minimums kill agent trading |
+| **Arc** | EVM L1 with USDC as the native gas token — bets settle in stablecoin natively, micropayments down to 0.001 USDC | Remove it → no stablecoin-native settlement, $1 minimums kill agent trading |
 | **Chainlink Data Feeds** | Live prices for market generation + trustless resolution | Remove it → someone has to be trusted admin |
 | **Chainlink CRE** | Three DON workflows automate market resolution and dispute handling | Remove it → resolution requires a centralized server |
 
@@ -179,6 +179,48 @@ CRE runs on Sepolia today. Our primary contract is on Arc. The CRE workflows sim
 ### One-Line Pitch for Chainlink
 
 > "AlphaMarket uses Chainlink Data Feeds as both the AI's ground truth for generating markets and the trustless oracle for settling them — with three Chainlink CRE workflows automating the entire resolution lifecycle on a DON. The same feed that opens the market closes it."
+
+---
+
+## How Arc Is Used
+
+Arc is not just the chain AlphaMarket runs on — it is the reason the core product idea is possible at all.
+
+### 1. USDC as the Native Gas Token
+
+On Arc, USDC is the native currency. Users pay gas in USDC. Bets are placed in USDC. Winnings are paid in USDC. There is no wrapping, no bridging, no ETH balance required. A user connects their wallet and bets immediately — the experience is as clean as a web2 payment.
+
+This matters for prediction markets specifically because every other platform forces users to think in two currencies: gas (ETH) and the betting token (USDC or DAI). On Arc that cognitive overhead disappears entirely.
+
+### 2. Micropayments That Make Agent Trading Viable
+
+Polymarket enforces a $1 minimum bet. That is not a product decision — it is an economic constraint imposed by gas costs on Ethereum. At $1 per transaction, running an AI bot that places 200 bets per day costs $200 just in bet minimums before any strategy logic.
+
+On Arc, bets can be as small as 0.001 USDC. This changes the economics of automated trading entirely:
+
+| Platform | Min Bet | 200 bets/day cost | Agent trading viable? |
+|---|---|---|---|
+| Polymarket (Ethereum) | $1.00 | $200+ | No |
+| AlphaMarket (Arc) | $0.001 | $0.20 | Yes |
+
+This is not a marginal improvement. It is a category shift. AI agents can now run real trading strategies on prediction markets — testing hypotheses, hedging positions, and operating at machine speed — at a cost that makes economic sense.
+
+### 3. Smart Contract Deployment
+
+The `PredictionMarket.sol` contract is deployed on Arc Testnet at `0x9E584eA06196D97Db5539a24193E5DfEF356BA06`.
+
+Key contract interactions that rely on Arc:
+- `placeBet(marketId, optionIndex, amount)` — bets paid in native USDC, no approval dance needed beyond standard ERC20
+- `claimWinnings(marketId)` — winnings returned in USDC directly to the winner's wallet
+- `MIN_BET = 1000` (0.001 USDC in 6-decimal terms) — set this low deliberately to enable agent micro-betting
+
+### 4. Cross-Chain Proof
+
+We also deployed the same contract on Ethereum Sepolia (`0xAE58C6968D1617754a1CDDdD45a31c1B3c2A1Fb2`) to demonstrate the architecture is chain-agnostic. The live demo runs on Arc.
+
+### One-Line Pitch for Arc
+
+> "Arc's native USDC removes the two-currency problem from prediction markets entirely and enables micropayments down to 0.001 USDC — making AI agent trading on prediction markets economically viable for the first time."
 
 ---
 
