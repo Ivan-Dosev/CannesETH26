@@ -62,10 +62,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
 
   const [open,      setOpen]      = useState(false);
   const [input,     setInput]     = useState("");
-  const [logs,      setLogs]      = useState<LogEntry[]>([{
-    ts: timestamp(), type: "ai",
-    message: "👋 Describe a trading strategy in plain English and I'll execute it automatically with your connected wallet. Your bot will watch live markets and place bets on your behalf.",
-  }]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [strategy,  setStrategy]  = useState<BotStrategy | null>(null);
   const [botActive, setBotActive] = useState(false);
   const [parsing,   setParsing]   = useState(false);
@@ -74,6 +71,11 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
   const bettedRef  = useRef<Set<number>>(new Set());
   const logsEndRef = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
+
+  // Add welcome message client-side only to avoid SSR hydration mismatch
+  useEffect(() => {
+    setLogs([{ ts: timestamp(), type: "ai", message: "👋 Describe a trading strategy in plain English and I'll execute it automatically with your connected wallet. Your bot will watch live markets and place bets on your behalf." }]);
+  }, []);
 
   function addLog(type: LogEntry["type"], message: string) {
     setLogs(prev => [...prev.slice(-99), { ts: timestamp(), type, message }]);
