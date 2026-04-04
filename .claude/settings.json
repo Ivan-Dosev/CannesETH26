@@ -42,7 +42,14 @@
       "Bash(cre --version)",
       "Read(//Users/dimitrov/.local/bin/**)",
       "Read(//usr/local/bin/**)",
-      "Read(//Users/dimitrov/**)"
+      "Read(//Users/dimitrov/**)",
+      "WebFetch(domain:docs.dynamic.xyz)",
+      "Bash(xargs cat:*)",
+      "Bash(grep -E \"\\\\.\\(js|ts|d\\\\.ts\\)$|package\\\\.json\")",
+      "Bash(ls -la /Users/dimitrov/Desktop/hack/Hacky/agent/node_modules/@dynamic-labs-wallet/node/*.d.ts)",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(p.get\\('main',''\\), p.get\\('module',''\\), p.get\\('exports',''\\), p.get\\('types',''\\)\\)\")",
+      "Bash(ls /Users/dimitrov/Desktop/hack/Hacky/agent/node_modules/@dynamic-labs-wallet/node-evm/ grep -r \"DynamicEvmWalletClient\" /Users/dimitrov/Desktop/hack/Hacky/agent/node_modules/@dynamic-labs-wallet/node-evm/*.d.ts)",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\); deps={**p.get\\('dependencies',{}\\), **p.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in deps.items\\(\\) if 'dynamic' in k or 'wagmi' in k or 'tanstack' in k or 'viem' in k]\")"
     ],
     "additionalDirectories": [
       "/tmp"

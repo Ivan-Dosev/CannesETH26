@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ethers } from "ethers";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useDynamicWallet } from "@/hooks/useDynamicWallet";
 import { Market, CONTRACT_ADDRESS, USDC_ADDRESS, CONTRACT_ABI, ERC20_ABI, ARC_CHAIN_ID } from "@/lib/contract";
 import type { BotStrategy } from "@/app/api/parse-strategy/route";
 
@@ -67,7 +67,7 @@ const SUGGESTIONS = [
 ];
 
 export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessionWallet }: Props) {
-  const { primaryWallet } = useDynamicContext();
+  const { address: primaryAddress } = useDynamicWallet();
 
   const [open,          setOpen]          = useState(false);
   const [input,         setInput]         = useState("");
@@ -98,7 +98,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
   // ── Create session wallet and fund it from user's main wallet ──
   async function enableAutoMode() {
     const ethereum = (window as any).ethereum;
-    if (!ethereum || !primaryWallet) {
+    if (!ethereum || !primaryAddress) {
       addLog("error", "Connect your wallet first");
       return;
     }
@@ -383,7 +383,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
               {!botActive ? (
                 <button
                   onClick={() => {
-                    if (!primaryWallet && !sessionWallet) { addLog("error", "Connect wallet first"); return; }
+                    if (!primaryAddress && !sessionWallet) { addLog("error", "Connect wallet first"); return; }
                     bettedRef.current.clear();
                     setBotActive(true);
                     addLog("ai", `🚀 Bot running! ${sessionWallet ? "Silent mode — no popups." : "MetaMask will prompt each bet."} Watching ${strategy.assets.join(", ")} ≤${strategy.triggerSecondsLeft}s`);
@@ -451,7 +451,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
                 <span className="font-pixel text-xs text-px-dim">USDC</span>
                 <button
                   onClick={enableAutoMode}
-                  disabled={funding || !primaryWallet}
+                  disabled={funding || !primaryAddress}
                   className="flex-1 btn-pixel bg-px-cyan/20 border border-px-cyan text-px-cyan font-pixel text-xs px-3 py-1.5 uppercase tracking-wide disabled:opacity-40 hover:bg-px-cyan/30 transition-colors"
                 >
                   {funding ? "SETTING UP..." : "ENABLE"}

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { UsersApi, Configuration } from "@dynamic-labs/sdk-api";
 
-const ENV_ID = process.env.NEXT_PUBLIC_DYNAMIC_ENV_ID!;
+const ENV_ID   = process.env.NEXT_PUBLIC_DYNAMIC_ENV_ID!;
+const DYNAMIC_API_KEY = process.env.DYNAMIC_API_KEY ?? "";
 const JWKS_URL = `https://app.dynamic.xyz/api/v0/sdk/${ENV_ID}/.well-known/jwks`;
+
+// Dynamic JS SDK client — used to fetch full user profile after JWT verification
+const dynamicUsersApi = new UsersApi(new Configuration({
+  basePath: "https://app.dynamic.xyz/api/v0",
+  apiKey:   DYNAMIC_API_KEY,
+}));
 
 // Cache the JWKS so we don't fetch on every request
 let jwksCache: { keys: any[] } | null = null;
@@ -68,7 +76,7 @@ async function verifyDynamicJwt(token: string): Promise<{ sub: string; email?: s
   return payload;
 }
 
-// GET /api/verify-user — verifies Dynamic JWT and returns user info
+// GET /api/verify-user — verifies Dynamic JWT then fetches full user via Dynamic JS SDK
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -78,15 +86,30 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Step 1: verify JWT signature using Dynamic JWKS (cryptographic proof)
     const payload = await verifyDynamicJwt(token);
+
+    // Step 2: fetch full user profile via Dynamic JS SDK (sdk-api)
+    let sdkUser = null;
+    if (DYNAMIC_API_KEY && payload.sub) {
+      try {
+        sdkUser = await dynamicUsersApi.getUser({
+          environmentId: ENV_ID,
+          userId:        payload.sub,
+        });
+      } catch {
+        // Non-fatal — JWT is still verified, SDK fetch is best-effort
+      }
+    }
 
     return NextResponse.json({
       verified:    true,
       userId:      payload.sub,
-      email:       payload.email ?? null,
-      alias:       payload.alias ?? null,
-      wallets:     payload.verified_credentials ?? [],
+      email:       (sdkUser as any)?.email ?? payload.email ?? null,
+      alias:       (sdkUser as any)?.alias ?? payload.alias ?? null,
+      wallets:     (sdkUser as any)?.wallets ?? payload.verified_credentials ?? [],
       environment: ENV_ID,
+      sdkEnriched: !!sdkUser,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message, verified: false }, { status: 401 });

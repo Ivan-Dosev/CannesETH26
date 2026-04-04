@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@dynamic-labs-sdk/client": "^0.23.2",
+    "@dynamic-labs-sdk/evm": "^0.23.2",
     "@dynamic-labs/ethereum": "^3.0.0",
     "@dynamic-labs/sdk-api": "^0.0.924",
     "@dynamic-labs/sdk-react-core": "^3.0.0",

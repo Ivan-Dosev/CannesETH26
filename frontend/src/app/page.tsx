@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useDynamicContext, useIsLoggedIn, useUserWallets } from "@dynamic-labs/sdk-react-core";
+import { useDynamicWallet } from "@/hooks/useDynamicWallet";
 import { Header } from "@/components/Header";
 import { MarketCard } from "@/components/MarketCard";
 import { PlayerProfile } from "@/components/PlayerProfile";
@@ -40,10 +40,7 @@ function StatBox({ label, value, color }: { label: string; value: string | numbe
 }
 
 export default function Home() {
-  const { primaryWallet, authToken, setShowDynamicUserProfile } = useDynamicContext();
-  const isLoggedIn  = useIsLoggedIn();
-  const userWallets = useUserWallets();
-  const userAddress = primaryWallet?.address;
+  const { address: userAddress, isLoggedIn, authToken, openModal } = useDynamicWallet();
 
   const [markets,     setMarkets]     = useState<Market[]>([]);
   const [userBets,    setUserBets]    = useState<Record<number, UserBet | null>>({});
@@ -92,9 +89,10 @@ export default function Home() {
         setMarkets(loaded);        // swap in-place — old cards stay until new data lands
         setInitialLoad(false);
 
-        // Always auto-generate when no live markets exist
-        const hasLive = loaded.some(isLive);
-        if (!hasLive && !generatingRef.current) {
+        // Only generate when there are no live OR awaiting markets
+        // (awaiting = expired but not yet resolved — new markets should wait for them to settle)
+        const hasActive = loaded.some((m) => !m.resolved && !m.cancelled);
+        if (!hasActive && !generatingRef.current) {
           await triggerGenerate();
         }
       })
@@ -177,7 +175,7 @@ export default function Home() {
 
   async function handleLiveClick() {
     setFilter("live");
-    if (!markets.some(isLive)) await triggerGenerate();
+    if (!markets.some((m) => !m.resolved && !m.cancelled)) await triggerGenerate();
   }
 
   const liveCount     = markets.filter(isLive).length;
@@ -254,7 +252,7 @@ export default function Home() {
             betsWon={betsWon}
             totalWagered={totalWagered}
             verifiedUser={verifiedUser}
-            onOpenProfile={() => setShowDynamicUserProfile(true)}
+            onOpenProfile={openModal}
           />
         )}
 
