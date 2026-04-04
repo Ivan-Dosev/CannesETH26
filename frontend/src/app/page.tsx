@@ -58,16 +58,16 @@ export default function Home() {
   const [genSeconds,    setGenSeconds]    = useState(0);
   const genTimerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const refresh = useCallback(() => setLastRefresh(Date.now()), []);
+  const [lastBetRefresh, setLastBetRefresh] = useState(0);
+  const refreshBets = useCallback(() => setLastBetRefresh(Date.now()), []);
 
-  // Silent background poll every 10s + trigger resolution of pending markets
+  // Silent background resolution — just fires resolve-pending, never reloads markets
   useEffect(() => {
-    function tick() {
+    const id = setInterval(() => {
       fetch("/api/resolve-pending", { method: "POST" }).catch(() => {});
-      refresh();
-    }
-    const id = setInterval(tick, 20_000);
+    }, 20_000);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, []);
 
   // Live Chainlink prices — fetch once then every 30s
   useEffect(() => {
@@ -151,7 +151,7 @@ export default function Home() {
       results.forEach(({ id, bet }) => { map[id] = bet; });
       setUserBets(map);
     }).catch(console.error);
-  }, [markets, userAddress, sessionAddress, lastRefresh]);
+  }, [markets, userAddress, sessionAddress, lastRefresh, lastBetRefresh]);
 
   // Generate new markets when switching to LIVE tab with no live markets
   async function triggerGenerate() {
@@ -356,7 +356,7 @@ export default function Home() {
                 userBet={userBets[market.id]}
                 onRefresh={refresh}
                 livePrices={livePrices}
-                onBetPlaced={() => { refresh(); }}
+                onBetPlaced={() => { refreshBets(); }}
                 sessionWallet={sessionWallet}
               />
             ))}
@@ -391,7 +391,7 @@ export default function Home() {
         markets={markets}
         livePrices={livePrices}
         userBets={userBets}
-        onBetPlaced={() => { refresh(); }}
+        onBetPlaced={() => { refreshBets(); }}
         onSessionWallet={(addr, wallet) => { setSessionAddress(addr); setSessionWallet(wallet ?? null); }}
       />
     </div>

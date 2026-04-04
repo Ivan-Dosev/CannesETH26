@@ -40,6 +40,7 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
   const [amount,  setAmount]  = useState("");
   const [status,  setStatus]  = useState<"idle" | "switching" | "approving" | "betting" | "claiming" | "done" | "error">("idle");
   const [errorMsg, setError]  = useState("");
+  const [txHash,   setTxHash] = useState("");
 
   // Use window.ethereum directly — bypasses wagmi's mainnet-locked transport.
   // After wallet_switchEthereumChain we create a FRESH BrowserProvider so ethers
@@ -76,7 +77,7 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
   }
 
   async function handleBet() {
-    if (selectedOption === null) return;
+    if (selectedOption === null || status !== "idle") return;
     const usdcAmount = parseFloat(amount);
     if (isNaN(usdcAmount) || usdcAmount < 0.01) {
       setError("Minimum bet is 0.01 USDC");
@@ -84,6 +85,7 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
       return;
     }
 
+    setStatus("switching"); // disable button immediately before any async work
     try {
       const signer       = await getSigner();
       // Round to 6 decimal places max (USDC has 6 decimals)
@@ -104,17 +106,19 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
 
       setStatus("betting");
       const tx = await betContract.placeBet(market.id, selectedOption, usdcWei);
-
+      setTxHash(tx.hash);
       await tx.wait();
       setStatus("done");
-      setTimeout(onSuccess, 1500);
+      setTimeout(onSuccess, 2500);
     } catch (err: any) {
-      setError(err.message ?? "Transaction failed");
+      const msg = err?.reason ?? err?.message ?? JSON.stringify(err) ?? "Transaction failed";
+      setError(msg.slice(0, 300));
       setStatus("error");
     }
   }
 
   async function handleClaim() {
+    if (status !== "idle") return;
     try {
       setStatus("claiming");
       // If the bet was placed by the session wallet, claim using that signer directly
@@ -127,11 +131,13 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
       }
       const betContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const tx          = await betContract.claimWinnings(market.id);
+      setTxHash(tx.hash);
       await tx.wait();
       setStatus("done");
-      setTimeout(onSuccess, 1500);
+      setTimeout(onSuccess, 2500);
     } catch (err: any) {
-      setError(err.message ?? "Claim failed");
+      const msg = err?.reason ?? err?.message ?? JSON.stringify(err) ?? "Claim failed";
+      setError(msg.slice(0, 300));
       setStatus("error");
     }
   }
@@ -224,17 +230,27 @@ export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }:
           )}
 
           {/* Status messages */}
-          {status in STATUS_MSG && (
-            <div className={`text-xs text-center py-2 border ${
-              status === "done"  ? "border-px-green  text-px-green  neon-green"  :
-              status === "error" ? "border-px-red    text-px-red"                :
-                                   "border-px-yellow text-px-yellow neon-yellow"
+          {status !== "idle" && (
+            <div className={`text-xs text-center py-3 px-3 border flex flex-col gap-2 ${
+              status === "done"  ? "border-px-green  text-px-green  bg-px-green/10"  :
+              status === "error" ? "border-red-500   text-red-400   bg-red-500/10"   :
+                                   "border-px-yellow text-px-yellow bg-px-yellow/10 animate-pulse"
             }`}>
-              {STATUS_MSG[status]}
+              <span>{STATUS_MSG[status] ?? "⏳ Processing..."}</span>
+              {txHash && (
+                <a
+                  href={`https://testnet.arcscan.app/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-px-cyan underline font-mono text-xs break-all"
+                >
+                  tx: {txHash.slice(0, 18)}…{txHash.slice(-6)} ↗
+                </a>
+              )}
+              {status === "error" && (
+                <span className="text-red-400 text-xs break-all leading-relaxed text-left">{errorMsg}</span>
+              )}
             </div>
-          )}
-          {status === "error" && (
-            <p className="text-px-red text-xs break-all leading-relaxed">{errorMsg}</p>
           )}
 
           {/* Action button */}
