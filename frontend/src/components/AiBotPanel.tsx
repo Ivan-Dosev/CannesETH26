@@ -149,6 +149,9 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
       const transferTx = await usdcContract.transfer(sessionAddr, usdcWei);
       await transferTx.wait();
 
+      // Brief pause to avoid Arc RPC rate limit (100 req/s) between back-to-back transactions
+      await new Promise((r) => setTimeout(r, 1500));
+
       // Pre-approve contract from session wallet (no popup — signed by in-memory key)
       addLog("info", "🔓 Pre-approving contract spend from session wallet (no popup)...");
       const USDC_APPROVE_ABI = ["function approve(address spender, uint256 amount) returns (bool)"];

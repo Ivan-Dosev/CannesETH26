@@ -89,10 +89,10 @@ export default function Home() {
         setMarkets(loaded);        // swap in-place — old cards stay until new data lands
         setInitialLoad(false);
 
-        // Only generate when there are no live OR awaiting markets
-        // (awaiting = expired but not yet resolved — new markets should wait for them to settle)
-        const hasActive = loaded.some((m) => !m.resolved && !m.cancelled);
-        if (!hasActive && !generatingRef.current) {
+        // Only generate when there are no truly live (not yet expired) markets
+        const nowSec = Math.floor(Date.now() / 1000);
+        const hasLive = loaded.some((m) => !m.resolved && !m.cancelled && m.expiry > nowSec);
+        if (!hasLive && !generatingRef.current) {
           await triggerGenerate();
         }
       })
@@ -175,7 +175,8 @@ export default function Home() {
 
   async function handleLiveClick() {
     setFilter("live");
-    if (!markets.some((m) => !m.resolved && !m.cancelled)) await triggerGenerate();
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (!markets.some((m) => !m.resolved && !m.cancelled && m.expiry > nowSec)) await triggerGenerate();
   }
 
   const liveCount     = markets.filter(isLive).length;

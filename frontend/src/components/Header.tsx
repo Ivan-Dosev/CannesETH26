@@ -24,7 +24,6 @@ export function Header() {
 
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="text-3xl leading-none">🔮</div>
             <div>
               <h1 className="text-px-purple neon-purple font-pixel font-bold text-xl tracking-wide leading-none uppercase">
                 AlphaMarket
