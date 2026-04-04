@@ -48,8 +48,11 @@ function timestamp() {
   return new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-// Minimum trigger time — Arc tx takes ~3-5s to mine, so firing under 20s risks "Betting closed"
-const MIN_TRIGGER_SECS = 20;
+// Arc tx takes ~5s to mine. Fire within this window:
+//   timeLeft <= triggerSecondsLeft  AND  timeLeft >= MIN_BET_SECS
+// This prevents betting when there isn't enough runway for the tx to land.
+const MIN_TRIGGER_SECS = 20; // strategy minimum
+const MIN_BET_SECS     = 15; // abort if less than this remains — tx won't land in time
 
 const SUGGESTIONS = [
   "Bet $0.1 on ETH price markets when 20s left, bet on whichever side Chainlink favors",
@@ -137,7 +140,15 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
       for (const market of markets) {
         if (market.resolved || market.cancelled) continue;
         const timeLeft = market.expiry - nowSec;
+        // Skip if outside the safe betting window
         if (timeLeft <= 0 || timeLeft > strategy.triggerSecondsLeft) continue;
+        if (timeLeft < MIN_BET_SECS) {
+          if (!bettedRef.current.has(market.id)) {
+            addLog("info", `⏭ Market #${market.id} skipped — only ${timeLeft}s left, too late for tx to land`);
+            bettedRef.current.add(market.id); // suppress repeat warnings
+          }
+          continue;
+        }
         if (bettedRef.current.has(market.id)) continue;
         if (userBets[market.id]) continue;
 
