@@ -136,18 +136,14 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
       const provider   = new ethers.BrowserProvider(ethereum);
       const signer     = await provider.getSigner();
       const usdcWei    = ethers.parseUnits(budget.toFixed(6), 6);
-      const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+      const USDC_FULL_ABI = [
+        "function approve(address spender, uint256 amount) returns (bool)",
+        "function transfer(address to, uint256 amount) returns (bool)",
+        "function allowance(address owner, address spender) view returns (uint256)",
+      ];
+      const usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_FULL_ABI, signer);
 
-      // Check + approve if needed
-      const allowance = await new ethers.Contract(USDC_ADDRESS, ERC20_ABI, arcProvider)
-        .allowance(await signer.getAddress(), hotWallet.address);
-      if (allowance < usdcWei) {
-        addLog("info", "📝 Approving USDC transfer (popup 1 of 2)...");
-        const approveTx = await usdcContract.approve(hotWallet.address, usdcWei);
-        await approveTx.wait();
-      }
-
-      addLog("info", "💳 Transferring USDC to session wallet (popup 2 of 2)...");
+      addLog("info", "💳 Transferring USDC to session wallet (MetaMask popup)...");
       const transferTx = await usdcContract.transfer(hotWallet.address, usdcWei);
       await transferTx.wait();
 
