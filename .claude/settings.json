@@ -29,7 +29,20 @@
       "Bash(git push:*)",
       "Bash(curl -s -X POST http://localhost:3001/api/resolve-pending)",
       "Bash(curl -s -X POST http://localhost:3001/api/create-markets)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm search:*)",
+      "Bash(grep -v \"^$\")",
+      "Read(//Users/dimitrov/Desktop/hack/Hacky/**)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)",
+      "Bash(git commit -m 'Hide floating bot button when panel is open to prevent overlap with SEND:*)",
+      "Bash(git commit -m 'Fix hydration error: init log in useEffect not useState:*)",
+      "Bash(git commit -m 'Fix bot betting on markets with insufficient time remaining:*)",
+      "Bash(git commit -m 'Add CLEAR button to AI bot chat log:*)",
+      "Bash(cre --version)",
+      "Read(//Users/dimitrov/.local/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/dimitrov/**)"
     ],
     "additionalDirectories": [
       "/tmp"

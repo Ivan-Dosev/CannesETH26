@@ -21,7 +21,7 @@ const AGGREGATOR_ABI = [
 const FEEDS: Record<string, { address: string; divisor?: number }> = {
   "ETH/USD":  { address: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" },
   "SOL/USD":  { address: "0x4ffC43a60e009B551865A93d232E33Fce9f01507" },
-  "BTC/USD":  { address: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c" },
+  "BTC/USD":  { address: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88b" },
   "AVAX/USD": { address: "0xFF3EEb22B5E3dE6e705b44749C2559d704923FD7" },
   "ETH_GAS":  { address: "0x169E633A2D1E6c10dD91238Ba11c4A708dfEF37C", divisor: 1e9 },
 };

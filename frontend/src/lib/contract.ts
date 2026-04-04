@@ -37,9 +37,10 @@ export interface Market {
 }
 
 export interface UserBet {
-  amount:      bigint;
-  optionIndex: number;
-  claimed:     boolean;
+  amount:         bigint;
+  optionIndex:    number;
+  claimed:        boolean;
+  betFromSession?: boolean;
 }
 
 export function getProvider() {

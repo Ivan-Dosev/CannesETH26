@@ -55,6 +55,7 @@ export default function Home() {
   const [lastRefresh, setLastRefresh] = useState(Date.now());
   const [livePrices,     setLivePrices]     = useState<Record<string, number>>({});
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
+  const [sessionWallet,  setSessionWallet]  = useState<ethers.NonceManager | null>(null);
 
   const generatingRef   = useRef(false);
   const [genSeconds,    setGenSeconds]    = useState(0);
@@ -91,9 +92,9 @@ export default function Home() {
         setMarkets(loaded);
         setInitialLoad(false);
 
-        // Only auto-generate if user is actively watching the LIVE tab
+        // Always auto-generate when no live markets exist
         const hasLive = loaded.some(isLive);
-        if (!hasLive && !generatingRef.current && filter === "live") {
+        if (!hasLive && !generatingRef.current) {
           await triggerGenerate();
         }
       })
@@ -139,7 +140,7 @@ export default function Home() {
           // Fall back to session wallet (bot bets)
           if (sessionAddress) {
             const [sAmount, sOptionIndex, sClaimed] = await contract.getUserBet(m.id, sessionAddress);
-            if (sAmount > 0n) return { id: m.id, bet: { amount: sAmount, optionIndex: Number(sOptionIndex), claimed: sClaimed } };
+            if (sAmount > 0n) return { id: m.id, bet: { amount: sAmount, optionIndex: Number(sOptionIndex), claimed: sClaimed, betFromSession: true } };
           }
 
           return { id: m.id, bet: null };
@@ -357,6 +358,7 @@ export default function Home() {
                 onRefresh={refresh}
                 livePrices={livePrices}
                 onBetPlaced={() => { refresh(); setFilter("mybets"); }}
+                sessionWallet={sessionWallet}
               />
             ))}
           </div>
@@ -391,7 +393,7 @@ export default function Home() {
         livePrices={livePrices}
         userBets={userBets}
         onBetPlaced={() => { refresh(); setFilter("mybets"); }}
-        onSessionWallet={setSessionAddress}
+        onSessionWallet={(addr, wallet) => { setSessionAddress(addr); setSessionWallet(wallet ?? null); }}
       />
     </div>
   );

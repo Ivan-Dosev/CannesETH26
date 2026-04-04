@@ -14,7 +14,7 @@ interface Props {
   livePrices:      Record<string, number>;
   userBets:        Record<number, any>;
   onBetPlaced:     () => void;
-  onSessionWallet: (address: string | null) => void;
+  onSessionWallet: (address: string | null, wallet?: ethers.NonceManager | null) => void;
 }
 
 interface LogEntry {
@@ -158,7 +158,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
 
       const sessionAddress = await hotWallet.getAddress();
       setSessionWallet({ wallet: hotWallet, address: sessionAddress, budget, spent: 0 });
-      onSessionWallet(sessionAddress);
+      onSessionWallet(sessionAddress, hotWallet);
       addLog("success", `✅ Auto Mode enabled! Session wallet funded with $${budget} USDC`);
       addLog("ai", `🤖 Bot will now place bets silently — no more popups. Press START when ready.`);
     } catch (e: any) {
@@ -171,7 +171,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessi
   function revokeSession() {
     setSessionWallet(null);
     setBotActive(false);
-    onSessionWallet(null);
+    onSessionWallet(null, null);
     addLog("info", "🔒 Session wallet revoked. Funds remain at the session address — use your wallet to recover them.");
   }
 

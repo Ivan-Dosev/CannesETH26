@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import {
   Market,
+  UserBet,
   CONTRACT_ADDRESS,
   USDC_ADDRESS,
   CONTRACT_ABI,
@@ -16,9 +17,11 @@ const ARC_RPC       = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testne
 const ARC_CHAIN_HEX = "0x" + ARC_CHAIN_ID.toString(16);
 
 interface Props {
-  market:    Market;
-  onClose:   () => void;
-  onSuccess: () => void;
+  market:         Market;
+  userBet?:       UserBet | null;
+  sessionWallet?: ethers.NonceManager | null;
+  onClose:        () => void;
+  onSuccess:      () => void;
 }
 
 const OPTION_COLORS = [
@@ -32,7 +35,7 @@ const OPTION_SELECTED = [
   "border-px-green  bg-px-green    text-black",
 ];
 
-export function BetModal({ market, onClose, onSuccess }: Props) {
+export function BetModal({ market, userBet, sessionWallet, onClose, onSuccess }: Props) {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [amount,  setAmount]  = useState("");
   const [status,  setStatus]  = useState<"idle" | "switching" | "approving" | "betting" | "claiming" | "done" | "error">("idle");
@@ -114,7 +117,14 @@ export function BetModal({ market, onClose, onSuccess }: Props) {
   async function handleClaim() {
     try {
       setStatus("claiming");
-      const signer      = await getSigner();
+      // If the bet was placed by the session wallet, claim using that signer directly
+      // (no MetaMask popup needed — the key is already in memory)
+      let signer: ethers.Signer;
+      if (userBet?.betFromSession && sessionWallet) {
+        signer = sessionWallet;
+      } else {
+        signer = await getSigner();
+      }
       const betContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const tx          = await betContract.claimWinnings(market.id);
       await tx.wait();

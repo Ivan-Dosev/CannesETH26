@@ -36,13 +36,12 @@ The AI proposes. Chainlink disposes.
 │                   expiry reached + outcome needed                    │
 │                                 │                                    │
 │  ┌──────────────────────────────▼───────────────────────────────┐   │
-│  │  CHAINLINK CRE WORKFLOW (chainlink-workflow/)                │   │
+│  │  CHAINLINK CRE WORKFLOW (cre-workflow/)                      │   │
 │  │                                                              │   │
-│  │  Every 5 min on a DON:                                      │   │
+│  │  Runs on a DON (Decentralized Oracle Network):              │   │
 │  │  1. Read expired markets from contract                      │   │
-│  │  2. Download metadata from 0G Storage (resolution API spec) │   │
-│  │  3. Fetch real-world outcome from public API                │   │
-│  │  4. Call resolveMarket(id, winningOption)                   │   │
+│  │  2. Read live price from Chainlink Data Feed on-chain       │   │
+│  │  3. Call resolveMarket(id, winningOption)                   │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐   │
@@ -51,8 +50,8 @@ The AI proposes. Chainlink disposes.
 │  │  · Browse AI-generated markets                              │   │
 │  │  · Connect wallet via Dynamic (embedded wallets supported)  │   │
 │  │  · Place USDC bets                                          │   │
+│  │  · AI Trading Bot (session wallet, no popups)               │   │
 │  │  · Claim winnings                                           │   │
-│  │  · View AI provenance on 0G Storage                        │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -63,12 +62,100 @@ The AI proposes. Chainlink disposes.
 
 | Sponsor | What it does | Why it's load-bearing |
 |---|---|---|
-| **0G Compute** | LLM inference that generates market ideas | Remove it → just a manual prediction market |
+| **0G Compute** | LLM inference (LLaMA-70B) generates market ideas | Remove it → just a manual prediction market |
 | **0G Storage** | Stores full AI provenance (model, prompt, sources, reasoning) | Remove it → no way to verify the AI's work |
 | **Dynamic Node SDK** | Server wallet for the AI agent (no raw private keys) | Remove it → agent has no secure on-chain identity |
 | **Dynamic JS SDK** | User wallet connect (embedded + external wallets) | Remove it → users can't bet |
 | **Arc** | EVM L1, USDC-native settlement, prediction market contracts | Remove it → no stablecoin-native settlement layer |
-| **Chainlink CRE** | Decentralized oracle that fetches outcomes and resolves markets | Remove it → someone has to be trusted admin |
+| **Chainlink Data Feeds** | Live prices for market generation + trustless resolution | Remove it → someone has to be trusted admin |
+| **Chainlink CRE** | Decentralized automation that resolves markets on-chain | Remove it → resolution requires a centralized server |
+
+---
+
+## Deployed Contracts
+
+| Network | Address | Purpose |
+|---|---|---|
+| **Arc Testnet** | `0x9E584eA06196D97Db5539a24193E5DfEF356BA06` | Live demo — real USDC bets, AI markets |
+| **Ethereum Sepolia** | `0xAE58C6968D1617754a1CDDdD45a31c1B3c2A1Fb2` | Cross-chain deployment proof |
+
+---
+
+## How Chainlink Is Used
+
+### 1. Data Feeds — Price Oracle (Two Roles)
+
+**Role 1 — AI market generation context:**
+Before the AI generates a market, the agent reads live prices directly from Chainlink's `AggregatorV3Interface` contracts on Ethereum mainnet:
+- `ETH/USD` — `0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419`
+- `BTC/USD` — `0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88b`
+- `SOL/USD` — `0x4ffC43a60e009B551865A93d232E33Fce9f01507`
+- `AVAX/USD` — `0xFF3EEb22B5E3dE6e705b44749C2559d704923FD7`
+- `ETH Fast Gas` — `0x169E633A2D1E6c10dD91238Ba11c4A708dfEF37C`
+
+The question threshold comes from real Chainlink data: *"Will ETH drop below $2,050 in 2 minutes?"* — that $2,050 is the live Chainlink price at market creation time.
+
+**Role 2 — Trustless resolution:**
+When a market expires, the same Chainlink feed is read again. The live price is compared to the threshold embedded in the question. The winner is determined on-chain with no human involvement. Anyone can verify the result on Etherscan.
+
+**This is a closed loop: Chainlink opens the market and Chainlink closes it.**
+
+---
+
+### 2. Chainlink CRE — Decentralized Automation
+
+Three TypeScript workflows built with `@chainlink/cre-sdk`, located in `cre-workflow/alphamarket-resolver/`.
+
+#### Workflow 1 — Market Creation (`market-creation/`)
+**Trigger:** Cron
+
+- Uses `runtime.now()` for consensus timestamp (not a centralized clock)
+- Encodes `ACTION_CREATE` with question, strike price, and expiry
+- Calls `predictionMarket.writeReport()` — DON signs and submits on-chain
+
+#### Workflow 2 — Market Resolution (`market-resolution/`)
+**Trigger:** Cron (every 30 seconds in staging)
+
+- Loops through market IDs and calls `isResolvable()` on-chain
+- Reads `priceFeed.latestAnswer()` — live Chainlink price read inside the DON
+- Encodes `ACTION_RESOLVE` and submits via `writeReport()`
+- No centralized server involved — a network of Chainlink nodes reaches consensus
+
+**Successfully simulated via CRE CLI:**
+```
+2026-04-04T14:29:45Z [USER LOG] Market 0: resolvable — reading price feed...
+2026-04-04T14:29:47Z [USER LOG] BTC/USD price: $2051.28491863 (raw: 205128491863, decimals: 8)
+2026-04-04T14:29:48Z [USER LOG] Market 0: resolved! Price: $2051.28
+...
+✓ Workflow Simulation Result: "Resolved markets: 0, 1, 2, 3, 4"
+```
+
+#### Workflow 3 — Dispute Management (`market-dispute/`)
+**Trigger:** `LogTrigger` on `DisputeRaised` event
+
+The most advanced workflow — fires automatically when anyone calls `raiseDispute()` on the contract:
+1. Decodes the `DisputeRaised` event with typed bindings — gets `marketId`, `disputor`, `reason`
+2. Verifies market is in `Disputed` status on-chain
+3. Re-reads a **fresh** Chainlink price at that exact moment
+4. Submits `ACTION_RESOLVE_DISPUTE` — can overturn an incorrect resolution
+
+---
+
+### Architecture Split — Arc vs Sepolia
+
+| | Contract | Chain | Purpose |
+|---|---|---|---|
+| **Live demo** | `0x9E584...` | Arc Testnet | Real USDC betting, AI markets, live users |
+| **Our Sepolia deploy** | `0xAE58C...` | Ethereum Sepolia | Cross-chain proof of deployment |
+| **CRE simulation** | `0xEb792...` | Ethereum Sepolia | Chainlink's CRE-compatible interface contract |
+
+**Why the split:** CRE runs on Sepolia today; our primary contract is on Arc (Circle's L1). The CRE workflows simulate against the CRE-compatible interface contract on Sepolia. The resolution logic is identical — in the live demo the backend reads the same Chainlink feeds and calls `resolveMarket()` on Arc. Adapting the Arc contract to implement `IReceiver` for full CRE integration is the production next step.
+
+---
+
+### One-Line Pitch for Chainlink
+
+> "AlphaMarket uses Chainlink Data Feeds as both the AI's ground truth for generating markets and the trustless oracle for settling them — with Chainlink CRE automating the entire resolution lifecycle on a DON. Chainlink opens the market and Chainlink closes it."
 
 ---
 
@@ -76,98 +163,81 @@ The AI proposes. Chainlink disposes.
 
 ```
 Hacky/
-├── contracts/              Hardhat + Solidity
+├── contracts/                  Hardhat + Solidity
 │   ├── contracts/
-│   │   ├── PredictionMarket.sol
-│   │   └── MockERC20.sol   (testing only)
+│   │   └── PredictionMarket.sol
 │   ├── scripts/deploy.ts
-│   ├── test/
-│   └── hardhat.config.ts
+│   └── hardhat.config.ts       Arc + Sepolia networks configured
 │
-├── agent/                  AI market generator
+├── agent/                      AI market generator
 │   └── src/
-│       ├── index.ts        Entry point + cron loop
+│       ├── index.ts            Entry point + cron loop
 │       ├── marketGenerator.ts  0G Compute / LLM calls
+│       ├── chainlinkFeeds.ts   Reads live Chainlink prices on-chain
 │       ├── zeroGStorage.ts     0G Storage upload/download
 │       ├── dynamicWallet.ts    Dynamic server wallet API
-│       ├── config.ts
-│       └── logger.ts
+│       └── config.ts
 │
-├── chainlink-workflow/     CRE resolution workflow
-│   └── src/
-│       ├── workflow.ts     CRE workflow entry + config
-│       ├── resolver.ts     Core resolution logic
-│       ├── simulate.ts     Local simulation script
-│       └── watcher.ts      Fallback polling watcher
+├── cre-workflow/
+│   └── alphamarket-resolver/
+│       ├── market-creation/    CRE Workflow 1 — Cron → createMarket()
+│       ├── market-resolution/  CRE Workflow 2 — Cron → read feed → resolveMarket()
+│       └── market-dispute/     CRE Workflow 3 — LogTrigger → re-read feed → resolveDispute()
 │
-└── frontend/               Next.js + Dynamic JS SDK
+└── frontend/                   Next.js + Dynamic JS SDK
     └── src/
         ├── app/
-        │   ├── layout.tsx
-        │   └── page.tsx
-        ├── components/
-        │   ├── DynamicProvider.tsx
-        │   ├── Header.tsx
-        │   ├── MarketCard.tsx
-        │   └── BetModal.tsx
-        └── lib/
-            └── contract.ts
+        │   ├── page.tsx
+        │   └── api/
+        │       ├── create-markets/   AI market generation endpoint
+        │       ├── resolve-pending/  Backend resolution (reads Chainlink feeds)
+        │       ├── markets/          Market list with caching
+        │       ├── prices/           Live Chainlink price proxy
+        │       └── parse-strategy/   0G AI bot strategy parser
+        └── components/
+            ├── MarketCard.tsx
+            ├── BetModal.tsx
+            ├── AiBotPanel.tsx      AI Trading Bot with session wallet
+            ├── PlayerProfile.tsx
+            └── Header.tsx
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Deploy the smart contract
-
-```bash
-cd contracts
-cp .env.example .env
-# Fill in DEPLOYER_PRIVATE_KEY, ARC_RPC_URL, AI_AGENT_ADDRESS, CHAINLINK_RESOLVER
-npm install
-npm run compile
-npm run deploy:arc
-```
-
-### 2. Start the AI agent
-
-```bash
-cd agent
-cp .env.example .env
-# Fill in ZG_API_KEY, DYNAMIC_API_KEY, DYNAMIC_ENV_ID, CONTRACT_ADDRESS
-npm install
-npm start
-```
-
-On first run, the agent will:
-- Get/create a Dynamic server wallet (print its address — add to contract as `aiAgent`)
-- Call 0G Compute to generate 3 markets
-- Upload metadata to 0G Storage
-- Create markets on-chain
-
-### 3. Simulate Chainlink CRE resolution
-
-```bash
-cd chainlink-workflow
-cp .env.example .env
-# Fill in RESOLVER_PRIVATE_KEY, CONTRACT_ADDRESS
-npm install
-npm run simulate
-```
-
-To deploy to the live CRE network, show Chainlink team the simulation output and they will deploy it for you during the hackathon.
-
-### 4. Run the frontend
+### 1. Run the frontend
 
 ```bash
 cd frontend
-cp .env.example .env
-# Fill in NEXT_PUBLIC_DYNAMIC_ENV_ID, NEXT_PUBLIC_CONTRACT_ADDRESS
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open http://localhost:3002
+
+### 2. Simulate Chainlink CRE resolution
+
+```bash
+cd cre-workflow/alphamarket-resolver/market-resolution
+bun install
+cre workflow simulate market-resolution --target staging-settings
+```
+
+### 3. Deploy contract to Sepolia
+
+```bash
+cd contracts
+USDC_ADDRESS=0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 \
+npx hardhat run scripts/deploy.ts --network sepolia
+```
+
+### 4. Deploy contract to Arc
+
+```bash
+cd contracts
+npx hardhat run scripts/deploy.ts --network arc
+```
 
 ---
 
@@ -179,23 +249,27 @@ Open http://localhost:3000
 **Only Chainlink CRE can resolve markets** (`onlyChainlinkResolver` modifier)
 — No human admin. The `chainlinkResolver` address is the CRE oracle.
 
+**MIN_BET = 1000 (0.001 USDC)**
+— Arc supports micropayments natively as USDC is the native gas token.
+
 **2% protocol fee** on winnings
 — Sustainable revenue model. Fee goes to contract owner.
 
 **0G Storage hash on-chain**
 — Every market has an immutable pointer to its AI provenance.
 Anyone can verify exactly which model created the market, what prompt was used,
-and which API will be used to resolve it — all before placing a bet.
+and which data feed resolves it — all before placing a bet.
 
 ---
 
-## Deployed Contracts
+## AI Trading Bot
 
-> Fill in after deployment
-
-| Network | Address |
-|---|---|
-| Arc Testnet | `0x...` |
+The frontend includes an AI-powered trading bot (`AiBotPanel.tsx`) that:
+- Accepts natural language strategy: *"Bet $0.1 on ETH markets when 20s remain"*
+- Parses strategy via 0G Compute (LLaMA-70B) with keyword fallback
+- Uses an **ephemeral session wallet** — fund once with MetaMask, bot bets silently with no further popups
+- Monitors live Chainlink prices to determine which side to bet on
+- Claims winnings automatically from the session wallet
 
 ---
 

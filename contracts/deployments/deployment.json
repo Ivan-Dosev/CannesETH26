@@ -1,10 +1,10 @@
 {
-  "network": "arc",
-  "chainId": "5042002",
-  "contractAddress": "0x1c2058B62ed0CB31A63D742A4DAC1de7cd2a15B7",
-  "usdcAddress": "0x3600000000000000000000000000000000000000",
+  "network": "sepolia",
+  "chainId": "11155111",
+  "contractAddress": "0xAE58C6968D1617754a1CDDdD45a31c1B3c2A1Fb2",
+  "usdcAddress": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
   "aiAgent": "0xa6BBBbB9bc3c7dA1c3bfD040411e95bAB6Df5664",
   "chainlinkResolver": "0xa6BBBbB9bc3c7dA1c3bfD040411e95bAB6Df5664",
-  "deployedAt": "2026-04-03T19:34:31.706Z",
+  "deployedAt": "2026-04-04T12:49:53.147Z",
   "deployer": "0xa6BBBbB9bc3c7dA1c3bfD040411e95bAB6Df5664"
 }

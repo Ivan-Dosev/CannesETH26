@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Market, formatUsdc, getOptionOdds, getOptionPct } from "@/lib/contract";
+import { ethers } from "ethers";
+import { Market, UserBet, formatUsdc, getOptionOdds, getOptionPct } from "@/lib/contract";
 import { BetModal } from "./BetModal";
 
 interface Props {
-  market:      Market;
-  userBet?:    { amount: bigint; optionIndex: number; claimed: boolean } | null;
-  onRefresh:   () => void;
-  livePrices?: Record<string, number>;
-  onBetPlaced?: () => void;
+  market:         Market;
+  userBet?:       UserBet | null;
+  onRefresh:      () => void;
+  livePrices?:    Record<string, number>;
+  onBetPlaced?:   () => void;
+  sessionWallet?: ethers.NonceManager | null;
 }
 
 function getLiveFeedKey(question: string): string | null {
@@ -38,7 +40,7 @@ const OPTION_COLORS = [
   { bar: "bg-px-green",  border: "border-px-green",  glow: "shadow-glow-green"  },
 ];
 
-export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetPlaced }: Props) {
+export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetPlaced, sessionWallet }: Props) {
   const [betModalOpen, setBetModalOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -219,6 +221,8 @@ export function MarketCard({ market, userBet, onRefresh, livePrices = {}, onBetP
       {betModalOpen && (
         <BetModal
           market={market}
+          userBet={userBet}
+          sessionWallet={sessionWallet}
           onClose={() => setBetModalOpen(false)}
           onSuccess={() => { setBetModalOpen(false); onRefresh(); onBetPlaced?.(); }}
         />

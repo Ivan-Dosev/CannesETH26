@@ -21,6 +21,12 @@ const config: HardhatUserConfig = {
       chainId:  parseInt(process.env.ARC_CHAIN_ID ?? "1234"),
       accounts: [DEPLOYER_KEY],
     },
+    // Ethereum Sepolia — for CRE workflow simulation
+    sepolia: {
+      url:      process.env.SEPOLIA_RPC_URL ?? "https://ethereum-sepolia-rpc.publicnode.com",
+      chainId:  11155111,
+      accounts: [DEPLOYER_KEY],
+    },
     // For local testing
     hardhat: {
       chainId: 31337,
