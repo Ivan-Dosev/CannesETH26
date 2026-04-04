@@ -10,10 +10,11 @@ const ARC_RPC       = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testne
 const ARC_CHAIN_HEX = "0x" + ARC_CHAIN_ID.toString(16);
 
 interface Props {
-  markets:    Market[];
-  livePrices: Record<string, number>;
-  userBets:   Record<number, any>;
-  onBetPlaced: () => void;
+  markets:         Market[];
+  livePrices:      Record<string, number>;
+  userBets:        Record<number, any>;
+  onBetPlaced:     () => void;
+  onSessionWallet: (address: string | null) => void;
 }
 
 interface LogEntry {
@@ -65,7 +66,7 @@ const SUGGESTIONS = [
   "Watch all price markets, bet $0.2 on the likely winner when 25 seconds remain",
 ];
 
-export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props) {
+export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced, onSessionWallet }: Props) {
   const { primaryWallet } = useDynamicContext();
 
   const [open,          setOpen]          = useState(false);
@@ -157,6 +158,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
 
       const sessionAddress = await hotWallet.getAddress();
       setSessionWallet({ wallet: hotWallet, address: sessionAddress, budget, spent: 0 });
+      onSessionWallet(sessionAddress);
       addLog("success", `✅ Auto Mode enabled! Session wallet funded with $${budget} USDC`);
       addLog("ai", `🤖 Bot will now place bets silently — no more popups. Press START when ready.`);
     } catch (e: any) {
@@ -169,6 +171,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
   function revokeSession() {
     setSessionWallet(null);
     setBotActive(false);
+    onSessionWallet(null);
     addLog("info", "🔒 Session wallet revoked. Funds remain at the session address — use your wallet to recover them.");
   }
 

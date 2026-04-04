@@ -53,7 +53,8 @@ export default function Home() {
   const [verifiedUser, setVerifiedUser] = useState<{ userId: string; wallets: any[] } | null>(null);
   const [filter,      setFilter]      = useState<Filter>("live");
   const [lastRefresh, setLastRefresh] = useState(Date.now());
-  const [livePrices,  setLivePrices]  = useState<Record<string, number>>({});
+  const [livePrices,     setLivePrices]     = useState<Record<string, number>>({});
+  const [sessionAddress, setSessionAddress] = useState<string | null>(null);
 
   const generatingRef   = useRef(false);
   const [genSeconds,    setGenSeconds]    = useState(0);
@@ -112,7 +113,7 @@ export default function Home() {
       .catch(() => {});
   }, [isLoggedIn, authToken]);
 
-  // Load user bets + USDC balance — always use a fresh provider so new bets appear immediately
+  // Load user bets — check both main wallet AND session wallet (bot bets)
   useEffect(() => {
     if (!userAddress || markets.length === 0) { setUserBets({}); setUsdcBal("—"); return; }
     const ARC_RPC = process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.network";
@@ -131,8 +132,17 @@ export default function Home() {
     Promise.all(
       markets.map(async (m) => {
         try {
+          // Check main wallet first
           const [amount, optionIndex, claimed] = await contract.getUserBet(m.id, userAddress);
-          return { id: m.id, bet: amount > 0n ? { amount, optionIndex: Number(optionIndex), claimed } : null };
+          if (amount > 0n) return { id: m.id, bet: { amount, optionIndex: Number(optionIndex), claimed } };
+
+          // Fall back to session wallet (bot bets)
+          if (sessionAddress) {
+            const [sAmount, sOptionIndex, sClaimed] = await contract.getUserBet(m.id, sessionAddress);
+            if (sAmount > 0n) return { id: m.id, bet: { amount: sAmount, optionIndex: Number(sOptionIndex), claimed: sClaimed } };
+          }
+
+          return { id: m.id, bet: null };
         } catch {
           return { id: m.id, bet: null };
         }
@@ -142,7 +152,7 @@ export default function Home() {
       results.forEach(({ id, bet }) => { map[id] = bet; });
       setUserBets(map);
     }).catch(console.error);
-  }, [markets, userAddress, lastRefresh]);
+  }, [markets, userAddress, sessionAddress, lastRefresh]);
 
   // Generate new markets when switching to LIVE tab with no live markets
   async function triggerGenerate() {
@@ -381,6 +391,7 @@ export default function Home() {
         livePrices={livePrices}
         userBets={userBets}
         onBetPlaced={() => { refresh(); setFilter("mybets"); }}
+        onSessionWallet={setSessionAddress}
       />
     </div>
   );
