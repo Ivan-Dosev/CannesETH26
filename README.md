@@ -442,8 +442,3 @@ npx hardhat run scripts/deploy.ts --network sepolia
 - **Verifiable AI** — every market has a cryptographic receipt on 0G Storage locked on-chain
 - **Truly trustless** — the same oracle that inspired the question answers it
 
----
-
-## Team
-
-> Your names, Telegram handles, X handles
