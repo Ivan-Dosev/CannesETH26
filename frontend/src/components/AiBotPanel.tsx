@@ -357,7 +357,15 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
               {sessionWallet ? `🔑 Auto Mode · $${sessionWallet.spent.toFixed(2)}/$${sessionWallet.budget} spent` : "Powered by 0G Compute"} · {liveCount} live
             </p>
           </div>
-          <button onClick={() => setOpen(false)} className="text-px-dim hover:text-white text-lg font-bold leading-none">✕</button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setLogs([{ ts: timestamp(), type: "ai", message: "🧹 Chat cleared." }])}
+              className="font-pixel text-xs text-px-dim hover:text-px-red uppercase tracking-widest transition-colors"
+            >
+              CLEAR
+            </button>
+            <button onClick={() => setOpen(false)} className="text-px-dim hover:text-white text-lg font-bold leading-none">✕</button>
+          </div>
         </div>
 
         {/* Status bar */}
