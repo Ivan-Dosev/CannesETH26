@@ -24,9 +24,9 @@ interface LogEntry {
 
 // Session wallet — ephemeral key held only in memory, never persisted
 interface SessionWallet {
-  wallet:   ethers.Wallet | ethers.HDNodeWallet;
+  wallet:   ethers.NonceManager;
   address:  string;
-  budget:   number; // USDC funded
+  budget:   number;
   spent:    number;
 }
 
@@ -124,12 +124,13 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
         }
       }
 
-      // Generate ephemeral keypair
-      const ephemeral  = ethers.Wallet.createRandom();
+      // Generate ephemeral keypair, wrap in NonceManager so concurrent bets don't collide
+      const ephemeral   = ethers.Wallet.createRandom();
       const arcProvider = new ethers.JsonRpcProvider(ARC_RPC);
-      const hotWallet  = ephemeral.connect(arcProvider);
+      const hotWallet   = new ethers.NonceManager(ephemeral.connect(arcProvider));
 
-      addLog("info", `🆕 Session wallet: ${hotWallet.address.slice(0, 10)}…`);
+      const sessionAddr = await hotWallet.getAddress();
+      addLog("info", `🆕 Session wallet: ${sessionAddr.slice(0, 10)}…`);
       addLog("info", `💸 One MetaMask popup to fund it with $${budget} USDC — then the bot runs silently`);
 
       // Fund from user's main wallet (one popup)
@@ -144,16 +145,18 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
       const usdcContract = new ethers.Contract(USDC_ADDRESS, USDC_FULL_ABI, signer);
 
       addLog("info", "💳 Transferring USDC to session wallet (MetaMask popup)...");
-      const transferTx = await usdcContract.transfer(hotWallet.address, usdcWei);
+      const transferTx = await usdcContract.transfer(sessionAddr, usdcWei);
       await transferTx.wait();
 
-      // Pre-approve contract from session wallet
+      // Pre-approve contract from session wallet (no popup — signed by in-memory key)
       addLog("info", "🔓 Pre-approving contract spend from session wallet (no popup)...");
-      const hotUsdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, hotWallet);
+      const USDC_APPROVE_ABI = ["function approve(address spender, uint256 amount) returns (bool)"];
+      const hotUsdc = new ethers.Contract(USDC_ADDRESS, USDC_APPROVE_ABI, hotWallet);
       const approveTx2 = await hotUsdc.approve(CONTRACT_ADDRESS, ethers.MaxUint256);
       await approveTx2.wait();
 
-      setSessionWallet({ wallet: hotWallet, address: hotWallet.address, budget, spent: 0 });
+      const sessionAddress = await hotWallet.getAddress();
+      setSessionWallet({ wallet: hotWallet, address: sessionAddress, budget, spent: 0 });
       addLog("success", `✅ Auto Mode enabled! Session wallet funded with $${budget} USDC`);
       addLog("ai", `🤖 Bot will now place bets silently — no more popups. Press START when ready.`);
     } catch (e: any) {
@@ -287,7 +290,7 @@ export function AiBotPanel({ markets, livePrices, userBets, onBetPlaced }: Props
   }, [botActive, strategy, markets, livePrices, userBets, betsCount, sessionWallet]);
 
   // ── Silent bet (session wallet, no popup) ────────────────────
-  async function placeSilentBet(wallet: ethers.Wallet | ethers.HDNodeWallet, marketId: number, optionIndex: number, amount: number) {
+  async function placeSilentBet(wallet: ethers.NonceManager, marketId: number, optionIndex: number, amount: number) {
     const usdcWei   = ethers.parseUnits(amount.toFixed(6), 6);
     const contract  = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
     const tx        = await contract.placeBet(marketId, optionIndex, usdcWei);
